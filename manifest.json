@@ -10,8 +10,7 @@
   },
   "permissions": [
     "activeTab",
-    "scripting",
-    "offscreen"
+    "scripting"
   ],
   "action": {
     "default_icon": {
@@ -23,5 +22,27 @@
   },
   "background": {
     "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/presentation/*"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+
+  "host_permissions": [
+    "https://speech.googleapis.com/",
+    "https://generativelanguage.googleapis.com/"
+  ],
+
+  "commands": {
+    "toggle_recording": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S"
+      },
+      "description": "練習の開始/停止を切り替える"
+    }
   }
 }

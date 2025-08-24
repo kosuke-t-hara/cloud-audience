@@ -1,0 +1,22 @@
+/* content.css */
+.prezento-feedback-bubble {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 15px;
+  border-radius: 10px;
+  max-width: 300px;
+  font-size: 16px;
+  font-family: sans-serif;
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.prezento-feedback-bubble.show {
+  opacity: 1;
+  transform: translateY(0);
+}
