@@ -10,7 +10,8 @@
   },
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "offscreen"
   ],
   "action": {
     "default_icon": {
