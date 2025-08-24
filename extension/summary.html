@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>プレゼンテーション サマリー</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+    h1, h2 { border-bottom: 2px solid #4285F4; padding-bottom: 10px; }
+    .card { background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    #chart-container { width: 70%; max-width: 500px; margin: 20px auto; }
+  </style>
+  <script src="./lib/chart.umd.js"></script>
+</head>
+<body>
+  <h1>プレゼンテーション サマリーレポート</h1>
+  
+  <h2>総合評価</h2>
+  <div id="chart-container">
+    <canvas id="radarChart"></canvas>
+  </div>
+  
+  <h2><span style="color: #34A853;">✔</span> ポジティブなハイライト</h2>
+  <div class="card" id="highlight"></div>
+
+  <h2><span style="color: #fbbc05;">💡</span> ワンポイントアドバイス</h2>
+  <div class="card" id="advice"></div>
+
+  <script src="summary.js"></script>
+</body>
+</html>

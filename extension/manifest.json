@@ -10,7 +10,8 @@
   },
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "debugger"
   ],
   "action": {
     "default_icon": {
@@ -43,5 +44,9 @@
       },
       "description": "練習の開始/停止を切り替える"
     }
+  },
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }

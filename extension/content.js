@@ -5,8 +5,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('background.jsからメッセージを受信しました:', request);
 
   if (request.type === 'show-feedback') {
-    showFeedbackBubble(request.data);
     sendResponse({ status: 'フィードバックを表示しました。' });
+    showFeedbackBubble(request.data);
   }
 
   return true;
