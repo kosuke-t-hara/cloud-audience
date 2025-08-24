@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Prezento AI Coach",
+  "version": "0.1.0",
+  "description": "プレゼンの練習をAIがリアルタイムでサポートするChrome拡張機能です。",
+  "icons": {
+    "16": "images/icon16.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_icon": {
+      "16": "images/icon16.png",
+      "48": "images/icon48.png"
+    },
+    "default_title": "Prezento AI Coach",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
