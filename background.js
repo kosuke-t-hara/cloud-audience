@@ -92,7 +92,7 @@ function captureVisibleTab() {
 }
 
 async function sendToGeminiAPI(text, image) {
-  const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${GEMINI_API_KEY}`;
+  const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
   const requestBody = {
     contents: [{ parts: [
       { text: `あなたは親身なプレゼンの聴衆です。このスライド画像と、発表者の「${text}」という発言内容を踏まえ、80文字以内で短いコメントか、ポジティブなリアクションを一つだけ生成してください。` },

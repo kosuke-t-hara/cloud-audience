@@ -33,8 +33,7 @@
   ],
 
   "host_permissions": [
-    "https://speech.googleapis.com/",
-    "https://generativelanguage.googleapis.com/"
+    "<all_urls>"
   ],
 
   "commands": {
