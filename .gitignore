@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 # special files
 spec
+
+# functions/service-account-key.json
+functions/service-account-key.json
