@@ -25,14 +25,6 @@
     "service_worker": "background.js"
   },
 
-  "content_scripts": [
-    {
-      "matches": ["https://docs.google.com/presentation/*"],
-      "js": ["content.js"],
-      "css": ["content.css"]
-    }
-  ],
-
   "host_permissions": [
     "<all_urls>"
   ],

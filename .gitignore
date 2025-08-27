@@ -140,6 +140,7 @@ vite.config.ts.timestamp-*
 
 # special files
 spec
+GEMINI.md
 
 # functions/service-account-key.json
 functions/service-account-key.json

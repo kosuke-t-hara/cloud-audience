@@ -4,6 +4,7 @@ const CLOUD_FUNCTION_URL = 'https://coachapi-hruygwmczq-an.a.run.app';
 let helperWindowId = null;
 let isRecording = false;
 let fullTranscript = ""; // 全文を保存する変数
+let targetTabId = null;
 
 // ショートカットキーのリスナー
 chrome.commands.onCommand.addListener((command) => {
@@ -15,15 +16,38 @@ chrome.commands.onCommand.addListener((command) => {
 function startRecording() {
   isRecording = true;
   fullTranscript = ""; // 練習開始時にリセット
-  chrome.windows.create({
-    url: 'mic_helper.html', type: 'popup', width: 250, height: 150,
-  }, (win) => {
-    helperWindowId = win.id;
+  // 練習開始時に、これから操作するタブのIDを取得して保存する
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0]) {
+      console.error("操作対象のタブが見つかりません。");
+      return;
+    }
+    targetTabId = tabs[0].id; // IDを保存
+
+    // 練習開始時に、一度だけCSSとJSを注入する
+    chrome.scripting.insertCSS({
+      target: { tabId: targetTabId },
+      files: ["content.css"]
+    });
+    chrome.scripting.executeScript({
+      target: { tabId: targetTabId },
+      files: ["content.js"]
+    });
+
+    isRecording = true;
+    fullTranscript = "";
+    chrome.windows.create({
+      url: 'mic_helper.html', type: 'popup', width: 250, height: 150,
+    }, (win) => {
+      helperWindowId = win.id;
+    });
   });
 }
 
 function stopRecording() {
   isRecording = false;
+  targetTabId = null; 
+
   if (helperWindowId) {
     chrome.runtime.sendMessage({ type: 'stop_recording' });
     helperWindowId = null;
@@ -63,9 +87,20 @@ async function handleAudioChunk(audioContent) {
       })
     });
     const data = await response.json();
+
+    console.log("Cloud Functionからの応答データ:", data);
+
     if (data.feedback) {
       fullTranscript += data.transcript + " ";
-      chrome.tabs.sendMessage(tabs[0].id, { type: 'show-feedback', data: data.feedback });
+
+      // メッセージを送る直前に、アクティブなタブを取得する
+      if (targetTabId) {
+        // ステップ3: 注入完了後にメッセージを送信
+        chrome.tabs.sendMessage(targetTabId, { type: 'show-feedback', data: data.feedback });
+
+      } else {
+        console.error("フィードバック表示先のタブが見つかりません。");
+      }
     }
   } catch (error) {
     console.error("handleAudioChunk内でエラーが発生しました:", error.message, error.stack);
@@ -111,7 +146,7 @@ async function generateSummary() {
         }, 500); // タブの読み込みを待つ
       });
     } catch(error) {
-      console.error("JSONの解析に失敗しました。整形後の文字列:", jsonString, "エラー:", error);
+      console.error("JSONの解析に失敗しました。整形後の文字列:", response, "エラー:", error);
     }
 
   } catch (error) {

@@ -30,7 +30,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         scales: {
           r: {
             beginAtZero: true,
-            max: 5,
+            max: 100,
             ticks: { stepSize: 1 }
           }
         }
