@@ -3,34 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    body {
-      width: 200px;
-      font-family: sans-serif;
-      text-align: center;
-    }
-    button {
-      width: 80%;
-      padding: 10px;
-      margin-top: 10px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    #startButton {
-      background-color: #4285F4;
-      color: white;
-      border: none;
-    }
-    #stopButton {
-      background-color: #DB4437;
-      color: white;
-      border: none;
-    }
+    body { width: 250px; font-family: sans-serif; text-align: center; }
+    h3 { margin-bottom: 10px; }
+    button { width: 80%; padding: 10px; margin-top: 15px; font-size: 14px; cursor: pointer; border: none; }
+    #startButton { background-color: #4285F4; color: white; }
+    #stopButton { background-color: #DB4437; color: white; }
+    .mode-selection { display: flex; justify-content: space-around; padding: 10px; border-top: 1px solid #eee; border-bottom: 1px solid #eee; }
+    .mode-selection label { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+    .mode-selection span { font-size: 24px; } /* Emoji size */
   </style>
 </head>
 <body>
   <h3>Prezento AI Coach</h3>
+  
+  <div class="mode-selection">
+    <label>
+      <input type="radio" name="mode" value="presenter" checked>
+      <span>👔</span>
+      プレゼンター
+    </label>
+    <label>
+      <input type="radio" name="mode" value="creator">
+      <span>🎬</span>
+      クリエイター
+    </label>
+    <label>
+      <input type="radio" name="mode" value="thinking">
+      <span>🧠</span>
+      思考パートナー
+    </label>
+  </div>
+
   <button id="startButton">練習を開始</button>
   <button id="stopButton">練習を終了</button>
+  
   <script src="popup.js"></script>
 </body>
 </html>

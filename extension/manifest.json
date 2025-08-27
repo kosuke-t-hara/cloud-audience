@@ -11,7 +11,8 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "debugger"
+    "debugger",
+    "storage"
   ],
   "action": {
     "default_icon": {

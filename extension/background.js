@@ -5,15 +5,22 @@ let helperWindowId = null;
 let isRecording = false;
 let fullTranscript = ""; // 全文を保存する変数
 let targetTabId = null;
+let currentMode = 'presenter'; //
 
 // ショートカットキーのリスナー
 chrome.commands.onCommand.addListener((command) => {
   if (command === "toggle_recording") {
-    isRecording ? stopRecording() : startRecording();
+    // 1. ストレージからモードを読み込む
+    chrome.storage.local.get(['lastMode'], (result) => {
+      // 保存されたモードがなければ 'presenter' をデフォルトにする
+      const mode = result.lastMode || 'presenter';   
+      isRecording ? stopRecording() : startRecording(mode);
+    });
   }
 });
 
-function startRecording() {
+function startRecording(mode) {
+  currentMode = mode;
   isRecording = true;
   fullTranscript = ""; // 練習開始時にリセット
   // 練習開始時に、これから操作するタブのIDを取得して保存する
@@ -64,17 +71,37 @@ chrome.windows.onRemoved.addListener((windowId) => {
   }
 });
 
+// popup.jsからのメッセージを受け取るリスナー
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // audio_chunkやmic_errorは別のリスナーで処理するため、ここでは何もしない
+  if (request.type === 'audio_chunk' || request.type === 'mic_error') {
+    return true; // 非同期処理を示すためにtrueを返す
+  }
+
+  // ポップアップからの開始/停止リクエストを処理
+  if (request.action === "start") {
+    startRecording(request.mode);
+    sendResponse({ message: "練習を開始しました。" });
+  } else if (request.action === "stop") {
+    stopRecording();
+    sendResponse({ message: "練習を停止しました。" });
+  }
+  
+  // 非同期処理を示すためにtrueを返す
+  return true;
+});
+
 // mic_helper.jsからのメッセージを受け取るリスナー
-chrome.runtime.onMessage.addListener((request, sender) => {
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'audio_chunk') {
-    handleAudioChunk(request.data);
+    handleAudioChunk(request.data, currentMode);
   } else if (request.type === 'mic_error') {
     console.error("ヘルパーウィンドウでエラー:", request.error);
     stopRecording();
   }
 });
 
-async function handleAudioChunk(audioContent) {
+async function handleAudioChunk(audioContent, mode) {
   try {
     const screenshot = await captureVisibleTab();
     const response = await fetch(CLOUD_FUNCTION_URL, {
@@ -82,6 +109,7 @@ async function handleAudioChunk(audioContent) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'realtime-feedback',
+        mode: mode,
         audioContent: audioContent,
         imageContent: screenshot.split(',')[1]
       })
@@ -131,7 +159,8 @@ async function generateSummary() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'summary-report',
-        transcript: fullTranscript
+        transcript: fullTranscript,
+        mode: currentMode
       })
     });
 
