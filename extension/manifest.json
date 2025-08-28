@@ -41,5 +41,12 @@
 
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
-  }
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": [ "audio-processor.js" ],
+      "matches": [ "<all_urls>" ]
+    }
+  ]
 }

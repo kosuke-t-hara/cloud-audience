@@ -1,5 +1,8 @@
 // functions/index.js
-const functions = require('@google-cloud/functions-framework');
+
+const http = require('http');
+const WebSocket = require('ws');
+const fetch = require('node-fetch');
 const cors = require('cors')({origin: true});
 
 // Google Cloudクライアントライブラリ
@@ -204,59 +207,116 @@ async function getGeminiSummary(transcript, sentiment, mode) {
   return null;
 }
 
-functions.http('coachApi', async (req, res) => {
-  cors(req, res, async () => {
-    if (req.method !== 'POST') {
-      return res.status(405).send('Method Not Allowed');
-    }
+// --- HTTPサーバーの作成 ---
+const server = http.createServer((req, res) => {
+  // CORSを適用し、HTTPリクエストを処理
+  cors(req, res, () => {
+    // POSTリクエストで、かつ特定のパスの場合のみ処理
+    if (req.method === 'POST' && (req.url === '/feedback' || req.url === '/summary')) {
+      let body = '';
+      req.on('data', chunk => { body += chunk.toString(); });
+      req.on('end', async () => {
+        try {
+          const requestData = JSON.parse(body);
+          let responseData;
 
-    const { type, mode, history } = req.body;
+          if (req.url === '/feedback') {
+            // リアルタイムフィードバックの処理
+            responseData = await getGeminiVisionFeedback(
+              requestData.transcript, 
+              requestData.imageContent, 
+              requestData.mode, 
+              requestData.history
+            );
+          } else if (req.url === '/summary') {
+            // サマリーレポートの処理
+            const sentiment = await analyzeTextSentiment(requestData.transcript);
+            responseData = await getGeminiSummary(
+              requestData.transcript, 
+              sentiment, 
+              requestData.mode
+            );
+          }
+          
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(responseData));
 
-    if (type === 'realtime-feedback') {
-      // リアルタイムフィードバック処理
-      const { audioContent, imageContent } = req.body;
-      const transcript = await transcribeAudio(audioContent);
-      const feedback = await getGeminiVisionFeedback(transcript, imageContent, mode, history || []);
-      res.status(200).send({ transcript, feedback });
-
-    } else if (type === 'summary-report') {
-      // サマリーレポート処理
-      const { transcript } = req.body;
-      const sentiment = await analyzeTextSentiment(transcript);
-      const summary = await getGeminiSummary(transcript, sentiment, mode);
-      res.status(200).send(summary);
-      
+        } catch (error) {
+          console.error("HTTPリクエスト処理エラー:", error);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: "Internal Server Error" }));
+        }
+      });
     } else {
-      res.status(400).send('Invalid request type');
+      // POSTや指定パス以外は404を返す
+      res.writeHead(404);
+      res.end();
     }
   });
 });
 
-// Speech-to-Text関数
-async function transcribeAudio(audioContent) {
-  try {
-    const request = {
-      audio: {
-        content: audioContent,
-      },
-      config: {
-        encoding: 'WEBM_OPUS',
-        sampleRateHertz: 48000,
-        languageCode: 'ja-JP',
-        model: 'latest_long',
-      },
-    };
-    const [response] = await speechClient.recognize(request);
-    const transcription = response.results
-      .map(result => result.alternatives[0].transcript)
-      .join('\n');
-    console.log(`Speech-to-Text書き起こし: ${transcription}`);
-    return transcription;
-  } catch (error) {
-    console.error('Speech-to-Text APIエラー:', error);
-    return null;
-  }
-}
+// --- WebSocketサーバーのセットアップ ---
+const wss = new WebSocket.Server({ server });
+wss.on('connection', (ws) => {
+  console.log('クライアントが接続しました。');
+  let recognizeStream = null;
+  let currentMode = 'presenter'; // 各接続のモードを保持
+
+  ws.on('message', async (message) => {
+    try {
+      // まずはテキストメッセージ（設定情報）として解析を試みる
+      const msg = JSON.parse(message);
+      if (msg.type === 'start_session') {
+        currentMode = msg.mode || 'presenter';
+        if (recognizeStream) recognizeStream.end();
+        
+        recognizeStream = speechClient.streamingRecognize({
+            config: {
+              encoding: 'WEBM_OPUS',
+              sampleRateHertz: 48000,
+              languageCode: 'ja-JP',
+            },
+            interimResults: true,
+          })
+          .on('error', (err) => {
+            console.error('Speech-to-Textストリームエラー:', err);
+          })
+          .on('data', (data) => {
+            const transcript = data.results[0]?.alternatives[0]?.transcript || '';
+            const isFinal = data.results[0]?.isFinal || false;
+            
+            // 確定したテキストのみをクライアントに送り返す
+            if (isFinal && transcript) {
+              ws.send(JSON.stringify({
+                type: 'final_transcript',
+                transcript: transcript,
+                mode: currentMode // 現在のモードも一緒に返す
+              }));
+            }
+          });
+      } else if (msg.type === 'end_session') {
+        if (recognizeStream) recognizeStream.end();
+        recognizeStream = null;
+      }
+    } catch (e) {
+      // JSONとして解析できなければ、音声データとして扱う
+      if (Buffer.isBuffer(message) && recognizeStream) {
+        recognizeStream.write(message);
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('クライアントが切断しました。');
+    if (recognizeStream) recognizeStream.end();
+  });
+});
+
+// --- サーバーの起動 ---
+const port = process.env.PORT || 8080;
+server.listen(port, () => {
+  console.log(`サーバーがポート ${port} で起動しました。`);
+});
 
 // Natural Language API関数 (感情分析用)
 async function analyzeTextSentiment(text) {

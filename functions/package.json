@@ -4,16 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "functions-framework --target=coachApi"
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@google-cloud/functions-framework": "^4.0.0",
     "@google-cloud/language": "^6.3.0",
     "@google-cloud/speech": "^6.4.0",
-    "@google-cloud/vertexai": "^1.10.0",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "node-fetch": "^3.3.2",
+    "ws": "^8.18.3"
   }
 }

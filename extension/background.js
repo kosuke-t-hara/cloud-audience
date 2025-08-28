@@ -1,5 +1,12 @@
 // background.js
-const CLOUD_FUNCTION_URL = 'https://coachapi-hruygwmczq-an.a.run.app';
+
+// WebSocketサーバーのエンドポイントURL
+const WEBSOCKET_URL = 'wss://coach-server-819782463010.asia-northeast1.run.app'; 
+let websocket = null;
+
+const CLOUD_FUNCTION_URL = 'https://coach-server-819782463010.asia-northeast1.run.app';
+const CLOUD_FUNCTION_URL_feedback = CLOUD_FUNCTION_URL + '/feedback';
+const CLOUD_FUNCTION_URL_summary = CLOUD_FUNCTION_URL + '/summary';
 
 let helperWindowId = null;
 let isRecording = false;
@@ -21,6 +28,9 @@ chrome.commands.onCommand.addListener((command) => {
 });
 
 function startRecording(mode) {
+  if (isRecording) return;
+  console.log(`ストリーミングモードで練習を開始: ${mode}`);
+
   currentMode = mode;
   isRecording = true;
   fullTranscript = ""; // 練習開始時にリセット
@@ -44,20 +54,52 @@ function startRecording(mode) {
       files: ["content.js"]
     });
 
-    isRecording = true;
-    fullTranscript = "";
-    chrome.windows.create({
-      url: 'mic_helper.html', type: 'popup', width: 250, height: 150,
-    }, (win) => {
-      helperWindowId = win.id;
-    });
+    // WebSocket接続を確立
+    websocket = new WebSocket(WEBSOCKET_URL);
+
+    // 接続が開いたら、練習開始情報をサーバーに送信
+    websocket.onopen = () => {
+      console.log("WebSocketサーバーに接続しました。");
+      websocket.send(JSON.stringify({ type: 'start_session', mode: currentMode }));
+      // ヘルパーウィンドウを起動
+      chrome.windows.create({
+        url: 'mic_helper.html', type: 'popup', width: 250, height: 150,
+      }, (win) => {
+        helperWindowId = win.id;
+      });
+    };
+
+    // サーバーからメッセージ（文字起こし結果など）を受信
+    websocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'transcript') {
+        handleTranscriptFromServer(data);
+      }
+    };
+    websocket.onerror = (error) => {
+      console.error("WebSocketエラー:", error);
+    };
+    websocket.onclose = () => {
+      console.log("WebSocketサーバーとの接続が切れました。");
+      if (isRecording) {
+        stopRecording(); // 意図せず切れた場合も停止処理
+      }
+    };
   });
 }
 
 function stopRecording() {
+  if (!isRecording) return;
+  console.log("練習を停止します。");
+
   isRecording = false;
   targetTabId = null; 
 
+  if (websocket) {
+    websocket.send(JSON.stringify({ type: 'end_session' }));
+    websocket.close();
+    websocket = null;
+  }
   if (helperWindowId) {
     chrome.runtime.sendMessage({ type: 'stop_recording' });
     helperWindowId = null;
@@ -65,6 +107,15 @@ function stopRecording() {
   // 練習終了時にサマリー生成関数を呼び出す
   generateSummary();
 }
+
+// mic_helper.jsからの音声ストリームをWebSocketでサーバーに送信
+chrome.runtime.onMessage.addListener((request) => {
+  if (request.type === 'audio_stream' && websocket && websocket.readyState === WebSocket.OPEN) {
+    // mic_helper.jsからFloat32Array形式の生データが送られてくる
+    // これをサーバーに送る (サーバー側が受け取れる形式にエンコードが必要な場合もある)
+    websocket.send(request.data);
+  }
+});
 
 // ウィンドウが閉じられたことを検知
 chrome.windows.onRemoved.addListener((windowId) => {
@@ -76,9 +127,11 @@ chrome.windows.onRemoved.addListener((windowId) => {
 
 // popup.jsからのメッセージを受け取るリスナー
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  // audio_chunkやmic_errorは別のリスナーで処理するため、ここでは何もしない
-  if (request.type === 'audio_chunk' || request.type === 'mic_error') {
-    return true; // 非同期処理を示すためにtrueを返す
+
+  if (request.type === 'mic_error') {
+    console.error("ヘルパーウィンドウでエラー:", request.error);
+    stopRecording();
+    return;
   }
 
   // ポップアップからの開始/停止リクエストを処理
@@ -94,52 +147,43 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true;
 });
 
-// mic_helper.jsからのメッセージを受け取るリスナー
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'audio_chunk') {
-    handleAudioChunk(request.data, currentMode);
-  } else if (request.type === 'mic_error') {
-    console.error("ヘルパーウィンドウでエラー:", request.error);
-    stopRecording();
-  }
-});
+// サーバーからの文字起こし結果を処理する
+async function handleTranscriptFromServer(data) {
+  fullTranscript += data.transcript + " ";
+  
+  // 文が確定した場合のみ、Geminiにフィードバックを要求
+  if (data.is_final) {
+    console.log("確定した文:", data.transcript);
+    try {
+      const screenshot = await captureVisibleTab();
+      // GeminiへのリクエストはHTTPのCloud Functionを呼び出す（またはWebSocket経由で依頼）
+      const response = await fetch(CLOUD_FUNCTION_URL , {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'realtime-feedback',
+          mode: currentMode,
+          transcript: data.transcript, // 確定した文だけを送る
+          imageContent: screenshot.split(',')[1],
+          history: conversationHistory // 対話モードの場合
+        })
+      });
 
-async function handleAudioChunk(audioContent, mode) {
-  try {
-    const screenshot = await captureVisibleTab();
-    const response = await fetch(CLOUD_FUNCTION_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'realtime-feedback',
-        mode: mode,
-        audioContent: audioContent,
-        imageContent: screenshot.split(',')[1],
-        history: conversationHistory
-      })
-    });
-    const data = await response.json();
+      const feedbackData = await response.json();
+      if (feedbackData.feedback) {
+        if (targetTabId) {
+          chrome.tabs.sendMessage(targetTabId, { type: 'show-feedback', data: feedbackData.feedback });
+        }
 
-    console.log("Cloud Functionからの応答データ:", data);
-
-    if (data.feedback) {
-      // ユーザーの発話とAIの応答を履歴に追加
-      conversationHistory.push({ role: 'user', parts: [{ text: data.transcript }] });
-      conversationHistory.push({ role: 'model', parts: [{ text: data.feedback }] });
-
-      fullTranscript += data.transcript + " ";
-
-      // メッセージを送る直前に、アクティブなタブを取得する
-      if (targetTabId) {
-        // ステップ3: 注入完了後にメッセージを送信
-        chrome.tabs.sendMessage(targetTabId, { type: 'show-feedback', data: data.feedback });
-
-      } else {
-        console.error("フィードバック表示先のタブが見つかりません。");
+        // ユーザーの発話とAIの応答を履歴に追加 (使うのは対話モードのときだけ)
+        if (currentMode === 'dialogue') {
+          conversationHistory.push({ role: 'user', parts: [{ text: data.transcript }] });
+          conversationHistory.push({ role: 'model', parts: [{ text: data.feedback }] });
+        }
       }
+    } catch (error) {
+      console.error("フィードバック生成エラー:", error);
     }
-  } catch (error) {
-    console.error("handleAudioChunk内でエラーが発生しました:", error.message, error.stack);
   }
 }
 
