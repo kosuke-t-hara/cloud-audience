@@ -6,6 +6,7 @@ let isRecording = false;
 let fullTranscript = ""; // 全文を保存する変数
 let targetTabId = null;
 let currentMode = 'presenter'; //
+let conversationHistory = []; // 会話履歴
 
 // ショートカットキーのリスナー
 chrome.commands.onCommand.addListener((command) => {
@@ -23,6 +24,8 @@ function startRecording(mode) {
   currentMode = mode;
   isRecording = true;
   fullTranscript = ""; // 練習開始時にリセット
+  conversationHistory = []; // 会話履歴をリセット
+
   // 練習開始時に、これから操作するタブのIDを取得して保存する
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs[0]) {
@@ -111,7 +114,8 @@ async function handleAudioChunk(audioContent, mode) {
         type: 'realtime-feedback',
         mode: mode,
         audioContent: audioContent,
-        imageContent: screenshot.split(',')[1]
+        imageContent: screenshot.split(',')[1],
+        history: conversationHistory
       })
     });
     const data = await response.json();
@@ -119,6 +123,10 @@ async function handleAudioChunk(audioContent, mode) {
     console.log("Cloud Functionからの応答データ:", data);
 
     if (data.feedback) {
+      // ユーザーの発話とAIの応答を履歴に追加
+      conversationHistory.push({ role: 'user', parts: [{ text: data.transcript }] });
+      conversationHistory.push({ role: 'model', parts: [{ text: data.feedback }] });
+
       fullTranscript += data.transcript + " ";
 
       // メッセージを送る直前に、アクティブなタブを取得する
@@ -167,11 +175,13 @@ async function generateSummary() {
     try {
       // テキストをJSONとして解析する
       const summaryData = await response.json();
+
+      console.log("サマリー生成結果:", summaryData);
       // 結果を新しいタブで開く
       chrome.tabs.create({ url: 'summary.html' }, (tab) => {
         // 新しいタブにデータを送る
         setTimeout(() => {
-          chrome.tabs.sendMessage(tab.id, { type: 'show_summary', data: summaryData });
+          chrome.tabs.sendMessage(tab.id, { type: 'show_summary', data: summaryData, mode: currentMode });
         }, 500); // タブの読み込みを待つ
       });
     } catch(error) {

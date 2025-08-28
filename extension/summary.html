@@ -12,18 +12,34 @@
   <script src="./lib/chart.umd.js"></script>
 </head>
 <body>
-  <h1>プレゼンテーション サマリーレポート</h1>
+  <h1>サマリーレポート</h1>
   
-  <h2>総合評価</h2>
-  <div id="chart-container">
-    <canvas id="radarChart"></canvas>
+  <div id="rating-summary" style="display: none;">
+    <h2>総合評価</h2>
+    <div id="chart-container">
+      <canvas id="radarChart"></canvas>
+    </div>
+    <h2><span style="color: #34A853;">✔</span> ポジティブなハイライト</h2>
+    <div class="card" id="highlight"></div>
+    <h2><span style="color: #fbbc05;">💡</span> ワンポイントアドバイス</h2>
+    <div class="card" id="advice"></div>
   </div>
-  
-  <h2><span style="color: #34A853;">✔</span> ポジティブなハイライト</h2>
-  <div class="card" id="highlight"></div>
 
-  <h2><span style="color: #fbbc05;">💡</span> ワンポイントアドバイス</h2>
-  <div class="card" id="advice"></div>
+  <div id="thinking-summary" style="display: none;">
+    <h2>思考セッションの要約</h2>
+    <h3>キーポイント</h3>
+    <div class="card">
+      <ul id="key-points-list"></ul>
+    </div>
+    <h3>新しいアイデアの種</h3>
+    <div class="card">
+      <ul id="new-ideas-list"></ul>
+    </div>
+    <h3>総括</h3>
+    <div class="card">
+      <p id="summary-text"></p>
+    </div>
+  </div>
 
   <script src="summary.js"></script>
 </body>

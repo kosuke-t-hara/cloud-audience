@@ -6,11 +6,11 @@
     const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
 
     // 5秒ごとに音声を区切ってbackground.jsへ送信
-    const fiveSeconds = 5000;
+    const interval = 10000;
     const recordingInterval = setInterval(() => {
       if (recorder.state === 'recording') recorder.stop();
       if (recorder.state === 'inactive') recorder.start();
-    }, fiveSeconds);
+    }, interval);
 
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) {

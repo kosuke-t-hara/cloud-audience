@@ -1,40 +1,63 @@
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'show_summary') {
+    const mode = request.mode;
     const data = request.data;
-    
-    // テキスト部分を表示
-    document.getElementById('highlight').textContent = data.highlight;
-    document.getElementById('advice').textContent = data.advice;
-    
-    // レーダーチャートを描画
-    const ctx = document.getElementById('radarChart').getContext('2d');
-    new Chart(ctx, {
-      type: 'radar',
-      data: {
-        labels: ['明朗さ', '情熱度', '示唆度', '構成力', '自信'],
-        datasets: [{
-          label: 'プレゼンスコア',
-          data: [
-            data.scores.clarity,
-            data.scores.passion,
-            data.scores.insightfulness,
-            data.scores.structure,
-            data.scores.confidence
-          ],
-          backgroundColor: 'rgba(66, 133, 244, 0.2)',
-          borderColor: 'rgba(66, 133, 244, 1)',
-          borderWidth: 2
-        }]
-      },
-      options: {
-        scales: {
-          r: {
-            beginAtZero: true,
-            max: 100,
-            ticks: { stepSize: 1 }
-          }
-        }
-      }
-    });
+
+    // モードに応じて表示を切り替える
+    if (mode === 'presenter' || mode === 'creator') {
+      // プレゼンター/クリエイターモードの処理
+      document.getElementById('rating-summary').style.display = 'block';
+      
+      document.getElementById('highlight').textContent = data.highlight;
+      document.getElementById('advice').textContent = data.advice;
+      
+      // レーダーチャートのラベルをモードに応じて変更
+      const labels = (mode === 'presenter')
+        ? ['明朗さ', '情熱度', '示唆度', '構成力', '自信']
+        : ['掴みの強さ', 'エンタメ性', '緩急', 'キラーフレーズ', '安全性'];
+      
+      const scores = (mode === 'presenter')
+        ? [data.scores.clarity, data.scores.passion, data.scores.insightfulness, data.scores.structure, data.scores.confidence]
+        : [data.scores.hook_strength, data.scores.entertainment, data.scores.pacing, data.scores.killer_phrase, data.scores.safety_risk];
+
+      const ctx = document.getElementById('radarChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'スコア',
+            data: scores,
+            backgroundColor: 'rgba(66, 133, 244, 0.2)',
+            borderColor: 'rgba(66, 133, 244, 1)',
+            borderWidth: 2
+          }]
+        },
+        options: { scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 1 }}}}
+      });
+
+    } else if (mode === 'thinking') {
+      // 思考パートナーモードの処理
+      document.getElementById('thinking-summary').style.display = 'block';
+
+      document.getElementById('summary-text').textContent = data.summary_text;
+      
+      const keyPointsList = document.getElementById('key-points-list');
+      data.key_points.forEach(point => {
+        const li = document.createElement('li');
+        li.textContent = point;
+        keyPointsList.appendChild(li);
+      });
+
+      const newIdeasList = document.getElementById('new-ideas-list');
+      data.new_ideas.forEach(idea => {
+        const li = document.createElement('li');
+        li.textContent = idea;
+        newIdeasList.appendChild(li);
+      });
+    }
   }
+  // 応答を返す
+  sendResponse({ status: "OK" });
+  return true;
 });
