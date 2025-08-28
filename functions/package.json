@@ -13,7 +13,6 @@
     "@google-cloud/functions-framework": "^4.0.0",
     "@google-cloud/language": "^6.3.0",
     "@google-cloud/speech": "^6.4.0",
-    "@google-cloud/vertexai": "^1.10.0",
     "cors": "^2.8.5"
   }
 }

@@ -1,5 +1,6 @@
 // background.js
 const CLOUD_FUNCTION_URL = 'https://coachapi-hruygwmczq-an.a.run.app';
+console.log('background.jsが読み込まれました');
 
 let helperWindowId = null;
 let isRecording = false;
@@ -50,6 +51,7 @@ function startRecording(mode) {
       url: 'mic_helper.html', type: 'popup', width: 250, height: 150,
     }, (win) => {
       helperWindowId = win.id;
+      console.log("マイクヘルパーウィンドウが作成されました:", helperWindowId);
     });
   });
 }
@@ -74,15 +76,22 @@ chrome.windows.onRemoved.addListener((windowId) => {
   }
 });
 
-// popup.jsからのメッセージを受け取るリスナー
+// mic_helper.jsからのメッセージを受け取るリスナー
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  // audio_chunkやmic_errorは別のリスナーで処理するため、ここでは何もしない
-  if (request.type === 'audio_chunk' || request.type === 'mic_error') {
-    return true; // 非同期処理を示すためにtrueを返す
+  if (request.type === 'audio_chunk') {
+    handleAudioChunk(request.data, currentMode);
+    return;
+  } 
+  
+  if (request.type === 'mic_error') {
+    console.error("ヘルパーウィンドウでエラー:", request.error);
+    stopRecording();
+    return;
   }
 
   // ポップアップからの開始/停止リクエストを処理
   if (request.action === "start") {
+    console.log("練習を開始します。");
     startRecording(request.mode);
     sendResponse({ message: "練習を開始しました。" });
   } else if (request.action === "stop") {
@@ -92,16 +101,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   // 非同期処理を示すためにtrueを返す
   return true;
-});
-
-// mic_helper.jsからのメッセージを受け取るリスナー
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'audio_chunk') {
-    handleAudioChunk(request.data, currentMode);
-  } else if (request.type === 'mic_error') {
-    console.error("ヘルパーウィンドウでエラー:", request.error);
-    stopRecording();
-  }
 });
 
 async function handleAudioChunk(audioContent, mode) {
