@@ -63,7 +63,8 @@
     // background.jsからの停止命令を待つ
     chrome.runtime.onMessage.addListener((request) => {
       if (request.type === 'stop_recording') {
-        clearInterval(recordingInterval);
+        console.log("録音を停止します。");
+
         if (recorder.state === 'recording') recorder.stop();
         stream.getTracks().forEach(track => track.stop());
         audioContext.close();
