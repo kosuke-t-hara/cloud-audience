@@ -5,24 +5,63 @@
   try {
 
     console.log("マイクの取得を試みています...");
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: true
+    });
+
+    // --- ここからが映像キャプチャーのロジック ---
+    const videoElement = document.createElement('video');
+    videoElement.srcObject = stream;
+    videoElement.muted = true;
+    videoElement.play();
+
+    const canvasElement = document.createElement('canvas');
+    const context = canvasElement.getContext('2d');
+
+    const audioOnlyStream = new MediaStream();
+    stream.getAudioTracks().forEach(track => audioOnlyStream.addTrack(track));
+
+    const recorder = new MediaRecorder(audioOnlyStream, { mimeType: 'audio/webm' });
 
     // 5秒ごとに音声を区切ってbackground.jsへ送信
     const audioContext = new AudioContext();
-    const source = audioContext.createMediaStreamSource(stream);
+    const source = audioContext.createMediaStreamSource(audioOnlyStream);
     const analyser = audioContext.createAnalyser();
     analyser.fftSize = 256;
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
     source.connect(analyser);
 
+    // 5秒に一度、フレームをキャプチャーしてbackground.jsに送る
+    const frameCaptureInterval = setInterval(() => {
+      // canvasのサイズをビデオに合わせる
+      canvasElement.width = videoElement.videoWidth;
+      canvasElement.height = videoElement.videoHeight;
+      // canvasに現在のビデオフレームを描画
+      context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+      // canvasの内容を画像データ(JPEG)として取得
+      const frameDataUrl = canvasElement.toDataURL('image/jpeg', 0.8);
+      
+      // background.jsにフレーム画像を送信
+      chrome.runtime.sendMessage({ type: 'video_frame', data: frameDataUrl.split(',')[1] });
+
+    }, 5000); // 5秒ごと
+    // --- ここまで映像キャプチャーのロジック ---
+
+
     let silenceStart = performance.now();
     const SILENCE_THRESHOLD = 5000; // 無音と判断する音量のしきい値
-    const PAUSE_DURATION = 2000; // 2秒の無音で「間」と判断
+    const PAUSE_DURATION = 3000; // 2秒の無音で「間」と判断
     console.log("音声の監視を開始します...");
 
     function detectSilence() {
+      // アニメーションフレームは録音中のみ実行する（負荷軽減）
+      if (recorder.state !== 'recording') {
+        requestAnimationFrame(detectSilence);
+        return;
+      }
+
       analyser.getByteFrequencyData(dataArray);
       let sum = dataArray.reduce((a, b) => a + b, 0);
 
@@ -33,6 +72,7 @@
           if (recorder.state === 'recording') {
             console.log("「間」を検知しました。音声を区切ります。");
             recorder.stop();
+            silenceStart = performance.now(); 
           }
         }
       } else {
@@ -55,7 +95,7 @@
 
     recorder.onstop = () => {
       // 停止したら、すぐに次の録音を開始
-      if (stream.active) {
+      if (audioOnlyStream.active) {
         recorder.start();
       }
     };
@@ -65,6 +105,9 @@
       if (request.type === 'stop_recording') {
         console.log("録音を停止します。");
 
+        // カメラキャプチャーをクリア
+        clearInterval(frameCaptureInterval);
+        // 録音を停止
         if (recorder.state === 'recording') recorder.stop();
         stream.getTracks().forEach(track => track.stop());
         audioContext.close();
@@ -77,7 +120,13 @@
     console.log("Smart MediaRecorderによる音声処理を開始しました。");
 
   } catch (err) {
-    console.error("マイクの取得に失敗:", err);
-    chrome.runtime.sendMessage({ type: 'mic_error', error: err.message });
+    console.error("マイクまたはカメラの取得に失敗");
+    chrome.runtime.sendMessage({ 
+      type: 'mic_error', 
+      error: { 
+        name: err.name,
+        message: err.message
+      } 
+    });
   }
 })();

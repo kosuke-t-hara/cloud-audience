@@ -5,6 +5,7 @@ const cors = require('cors')({origin: true});
 // Google Cloudクライアントライブラリ
 const { SpeechClient } = require('@google-cloud/speech').v1; // `.v1` を追記
 const { LanguageServiceClient } = require('@google-cloud/language');
+const { ImageAnnotatorClient } = require('@google-cloud/vision');
 
 // Gemini APIキーを環境変数から取得
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -13,10 +14,16 @@ const AI_MODEL = 'gemini-1.5-flash-001';
 // 認証情報を使ってクライアントを初期化
 const speechClient = new SpeechClient();
 const languageClient = new LanguageServiceClient();
+const visionClient = new ImageAnnotatorClient();
 
 // Gemini Vision関数 (リアルタイムフィードバック用)
-async function getGeminiVisionFeedback(text, image, mode, history) {
+async function getGeminiVisionFeedback(text, image, mode, history, facialFeedback) {
   if (!text) return null;
+
+  // ▼▼▼ 表情分析の結果をプロンプトに含めるための準備 ▼▼▼
+  const facialPromptPart = facialFeedback 
+    ? `また、話者の表情は「${facialFeedback}」と分析されています。` 
+    : '';
 
   let prompt;
   let requestBody;
@@ -29,6 +36,7 @@ async function getGeminiVisionFeedback(text, image, mode, history) {
           あなたは、関西弁でツッコミとボケの名手「サトシ」です。
           あなたの役割は、ユーモアのある会話のキャッチボールを続けることです。
           応答は必ず5文以内にしてください。
+          ${facialPromptPart}
         `}]
       };
 
@@ -50,7 +58,7 @@ async function getGeminiVisionFeedback(text, image, mode, history) {
       };
       break;
     case 'creator':
-      prompt = `あなたは辛口のYouTubeプロデューサーです。この画面と発話者の「${text}」という発言内容を踏まえ、視聴者が面白がるような、ユーモアのある短いツッコミを一つ生成してください。`;
+      prompt = `あなたは辛口のYouTubeプロデューサーです。この画面と発話者の「${text}」という発言内容を踏まえ、視聴者が面白がるような、ユーモアのある短いツッコミを一つ生成してください。${facialPromptPart}`;
       requestBody = {
         contents: [{ parts: [
           { text: prompt },
@@ -59,7 +67,7 @@ async function getGeminiVisionFeedback(text, image, mode, history) {
       };
       break;
     case 'thinking':
-      prompt = `あなたは優秀な聞き手です。発話者の「${text}」という発言内容を肯定的に受け止め、「なるほど」「面白いですね」といった短い相槌か、思考を促すための「それは具体的には？」のような短い質問を一つ生成してください。`;
+      prompt = `あなたは優秀な聞き手です。発話者の「${text}」という発言内容を肯定的に受け止め、「なるほど」「面白いですね」といった短い相槌か、思考を促すための「それは具体的には？」のような短い質問を一つ生成してください。${facialPromptPart}`;
       requestBody = {
         contents: [{ parts: [
           { text: prompt },
@@ -69,7 +77,7 @@ async function getGeminiVisionFeedback(text, image, mode, history) {
       break;
     case 'presenter':
     default:
-      prompt = `あなたは冷静なプレゼンの聴衆です。このスライド画像と、発表者の「${text}」という発言内容を踏まえ、80文字以内で短いコメントを一つだけ生成してください。`;
+      prompt = `あなたは冷静なプレゼンの聴衆です。このスライド画像と、発表者の「${text}」という発言内容を踏まえ、80文字以内で短いコメントを一つだけ生成してください。${facialPromptPart}`;
       requestBody = {
         contents: [{ parts: [
           { text: prompt },
@@ -234,9 +242,15 @@ functions.http('coachApi', async (req, res) => {
 
     if (type === 'realtime-feedback') {
       // リアルタイムフィードバック処理
-      const { audioContent, imageContent } = req.body;
-      const transcript = await transcribeAudio(audioContent);
-      const feedback = await getGeminiVisionFeedback(transcript, imageContent, mode, history || []);
+      const { audioContent, imageContent, videoFrameContent } = req.body;
+
+      // ▼▼▼ 音声文字起こしと表情分析を並行して実行 ▼▼▼
+      const [transcript, facialFeedback] = await Promise.all([
+        transcribeAudio(audioContent),
+        analyzeVideoFrame(videoFrameContent)
+      ]);
+
+      const feedback = await getGeminiVisionFeedback(transcript, imageContent, mode, history || [], facialFeedback);
       res.status(200).send({ transcript, feedback });
 
     } else if (type === 'summary-report') {
@@ -275,6 +289,52 @@ async function transcribeAudio(audioContent) {
   } catch (error) {
     console.error('Speech-to-Text APIエラー:', error);
     return null;
+  }
+}
+
+async function analyzeVideoFrame(videoFrameContent) {
+  // videoFrameContent がない、または空の場合は何もしない
+  if (!videoFrameContent) {
+    return null;
+  }
+
+  try {
+    const request = {
+      image: {
+        content: videoFrameContent,
+      },
+      features: [{ type: 'FACE_DETECTION' }],
+    };
+
+    const [result] = await visionClient.annotateImage(request);
+    const faces = result.faceAnnotations;
+
+    if (faces && faces.length > 0) {
+      const face = faces[0]; // 最初の顔を対象とする
+      const likelihoods = [
+        'UNKNOWN', 'VERY_UNLIKELY', 'UNLIKELY', 'POSSIBLE', 'LIKELY', 'VERY_LIKELY'
+      ];
+
+      // 喜びの感情が「ありそう(LIKELY)」以上の場合にフィードバックを生成
+      if (likelihoods.indexOf(face.joyLikelihood) >= 4) {
+        return "話者は喜びに満ちた、とても良い表情をしています";
+      }
+      // 驚きの感情が「ありそう(LIKELY)」以上の場合
+      if (likelihoods.indexOf(face.surpriseLikelihood) >= 4) {
+        return "話者は何かに驚いているような表情です";
+      }
+      // 悲しみの感情が「ありそう(LIKELY)」以上の場合
+      if (likelihoods.indexOf(face.sorrowLikelihood) >= 4) {
+        return "話者は少し悲しそうな、あるいは心配そうな表情に見えます";
+      }
+      
+      // 特に強い感情がなければ、ニュートラルなフィードバック
+      return "話者は落ち着いた表情です";
+    }
+    return "表情は検出されませんでした";
+  } catch (error) {
+    console.error('Vision APIエラー:', error);
+    return "表情の解析中にエラーが発生しました";
   }
 }
 

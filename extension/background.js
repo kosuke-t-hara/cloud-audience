@@ -8,6 +8,7 @@ let fullTranscript = ""; // 全文を保存する変数
 let targetTabId = null;
 let currentMode = 'presenter'; //
 let conversationHistory = []; // 会話履歴
+let latestVideoFrame = null; // 最新のカメラ映像を保存する変数
 
 // ショートカットキーのリスナー
 chrome.commands.onCommand.addListener((command) => {
@@ -78,13 +79,21 @@ chrome.windows.onRemoved.addListener((windowId) => {
 
 // mic_helper.jsからのメッセージを受け取るリスナー
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'video_frame') {
+    console.log("カメラフレームを受信しました。");
+    latestVideoFrame = request.data;
+    // このメッセージは非同期応答が不要なため、ここで処理を終える
+    return; 
+  }
+
   if (request.type === 'audio_chunk') {
     handleAudioChunk(request.data, currentMode);
-    return;
+    return true;
   } 
   
   if (request.type === 'mic_error') {
     console.error("ヘルパーウィンドウでエラー:", request.error);
+    console.error(request.error);
     stopRecording();
     return;
   }
@@ -114,6 +123,7 @@ async function handleAudioChunk(audioContent, mode) {
         mode: mode,
         audioContent: audioContent,
         imageContent: screenshot.split(',')[1],
+        videoFrameContent: latestVideoFrame, 
         history: conversationHistory
       })
     });
