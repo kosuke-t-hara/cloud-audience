@@ -10,6 +10,7 @@ let currentMode = 'presenter'; //
 let currentPersona = null;
 let conversationHistory = []; // 会話履歴
 let latestVideoFrame = null; // 最新のカメラ映像を保存する変数
+let sessionAnalysisResults = []; // 分析結果を蓄積する配列
 
 // ショートカットキーのリスナー
 chrome.commands.onCommand.addListener((command) => {
@@ -29,6 +30,7 @@ function startRecording(mode, persona) {
   isRecording = true;
   fullTranscript = ""; // 練習開始時にリセット
   conversationHistory = []; // 会話履歴をリセット
+  sessionAnalysisResults = []; // 分析結果をリセット
 
   // 練習開始時に、これから操作するタブのIDを取得して保存する
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -68,7 +70,7 @@ function stopRecording() {
     helperWindowId = null;
   }
   // 練習終了時にサマリー生成関数を呼び出す
-  generateSummary();
+  generateSummary(sessionAnalysisResults);
 }
 
 // ウィンドウが閉じられたことを検知
@@ -135,6 +137,11 @@ async function handleAudioChunk(audioContent) {
 
     console.log("Cloud Functionからの応答データ:", data);
 
+    // ▼▼▼ 返ってきた分析結果を配列に保存 ▼▼▼
+    if (data.analysisData) {
+      sessionAnalysisResults.push(data.analysisData);
+    }
+
     if (data.feedback) {
       // ユーザーの発話とAIの応答を履歴に追加
       conversationHistory.push({ role: 'user', parts: [{ text: data.transcript }] });
@@ -167,12 +174,12 @@ function captureVisibleTab() {
 }
 
 // 5. ▼▼▼ サマリー生成用の関数を丸ごと追加 ▼▼▼
-async function generateSummary() {
-  if (fullTranscript.trim().length === 0) {
-    console.log("発話がなかったため、サマリーを生成しませんでした。");
+async function generateSummary(analysisResults) {
+  if (analysisResults.length === 0) {
+    console.log("分析データがなかったため、サマリーを生成しませんでした。");
     return;
   }
-  console.log("サマリーを生成します。全文:", fullTranscript);
+  console.log("サマリーを生成します。分析結果:", analysisResults);
 
   try {
     const response = await fetch(CLOUD_FUNCTION_URL, {
@@ -180,7 +187,7 @@ async function generateSummary() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'summary-report',
-        transcript: fullTranscript,
+        analysisResults: analysisResults,
         mode: currentMode
       })
     });

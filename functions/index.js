@@ -9,12 +9,77 @@ const { ImageAnnotatorClient } = require('@google-cloud/vision');
 
 // Gemini APIキーを環境変数から取得
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const AI_MODEL = 'gemini-1.5-flash-001';
+const AI_MODEL = 'gemini-2.5-flash-001';
 
 // 認証情報を使ってクライアントを初期化
 const speechClient = new SpeechClient();
 const languageClient = new LanguageServiceClient();
 const visionClient = new ImageAnnotatorClient();
+
+// Speech-to-Textの秒・ナノ秒を秒（小数）に変換するヘルパー関数
+function convertTimeToSeconds(time) {
+  if (!time) return 0;
+  const seconds = time.seconds ? parseInt(time.seconds) : 0;
+  const nanos = time.nanos ? time.nanos / 1e9 : 0;
+  return seconds + nanos;
+}
+
+// Speech-to-Textの詳細な応答結果を分析するメイン関数
+function analyzeTranscriptionResults(results) {
+  if (!results || results.length === 0) {
+    return null;
+  }
+
+  let fullTranscript = '';
+  const allWords = [];
+  results.forEach(result => {
+    if (result.alternatives && result.alternatives.length > 0) {
+      fullTranscript += result.alternatives[0].transcript;
+      result.alternatives[0].words.forEach(wordInfo => {
+        allWords.push(wordInfo);
+      });
+    }
+  });
+
+  if (allWords.length === 0) {
+    return { fullTranscript, duration: 0, speakingRate: 0, longPauseCount: 0, fillerWordCount: 0 };
+  }
+
+  // 1. 合計発話時間の計算
+  const startTime = convertTimeToSeconds(allWords[0].startTime);
+  const endTime = convertTimeToSeconds(allWords[allWords.length - 1].endTime);
+  const duration = endTime - startTime;
+
+  // 2. 平均話速の計算 (文字/分)
+  const speakingRate = duration > 0 ? Math.round((fullTranscript.length / duration) * 60) : 0;
+
+  // 3. 2秒以上の「間」の回数をカウント
+  let longPauseCount = 0;
+  for (let i = 0; i < allWords.length - 1; i++) {
+    const currentWordEnd = convertTimeToSeconds(allWords[i].endTime);
+    const nextWordStart = convertTimeToSeconds(allWords[i + 1].startTime);
+    if (nextWordStart - currentWordEnd >= 2.0) {
+      longPauseCount++;
+    }
+  }
+
+  // 4. フィラーワードの回数をカウント
+  const fillerWords = ["あの", "えー", "えーっと", "まあ", "なんか", "こう"];
+  let fillerWordCount = 0;
+  allWords.forEach(wordInfo => {
+    if (fillerWords.includes(wordInfo.word)) {
+      fillerWordCount++;
+    }
+  });
+
+  return {
+    fullTranscript,
+    duration,
+    speakingRate,
+    longPauseCount,
+    fillerWordCount
+  };
+}
 
 // Gemini Vision関数 (リアルタイムフィードバック用)
 async function getGeminiVisionFeedback(text, image, mode, history, facialFeedback, persona) {
@@ -117,24 +182,40 @@ async function getGeminiVisionFeedback(text, image, mode, history, facialFeedbac
 }
 
 // Gemini Summary関数 (サマリーレポート用)
-async function getGeminiSummary(transcript, sentiment, mode, persona) {
+async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
   const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}`;
 
   let prompt;
   switch (mode) {
     case 'creator':
+      let creatorPersonaPromptPart = '敏腕YouTubeプロデューサー';
+      if (persona && persona.trim() !== '') {
+        creatorPersonaPromptPart = persona.trim();
+      }
       prompt = `
-        あなたは敏腕YouTubeプロデューサーです。
-        以下の「文字起こしデータ」と「感情分析スコア」を分析し、必ず以下「出力形式」のJSON形式にのみ従って評価を出力してください。
+        あなたは${creatorPersonaPromptPart}です。
+        以下の「分析データ」と「文字起こしデータ」を総合的に分析し、評価を出力してください。
 
         # ルール
         - 全てのキーと文字列の値は、必ずダブルクォーテーション("")で囲んでください。
         - 評価値は1から100の整数で表現してください。
         - highlight: 最も良かった点を含めて800字以内で記述
         - advice: 改善点を800字以内で記述
+        - 必ず「出力形式」のJSON形式にのみ従ってください。
 
-        # 感情分析スコア
-        ${JSON.stringify(sentiment)}
+        # 分析データ
+        - 平均話速: ${Math.round(combinedResults.speakingRate)} 文字/分
+        - 2秒以上の間の回数: ${combinedResults.longPauseCount} 回
+        - フィラーワードの回数: ${combinedResults.fillerWordCount} 回
+        - 感情分析スコア: ${JSON.stringify(sentiment)}
+
+        # 評価基準
+        - 上記の「分析データ」を最重要の客観的指標として扱い、評価スコアを決定してください。
+        - フックの強さ: 視聴者を惹きつける要素があるか。
+        - エンタメ性: 面白さや盛り上がりがあるか。
+        - ペーシング: 話のテンポや間の使い方。
+        - キラーフレーズ: 印象的な言葉やフレーズがあるか。
+        - 安全性リスク: 不適切な表現や炎上リスクがないか。
 
         # 出力形式 (JSON)
         {
@@ -150,17 +231,20 @@ async function getGeminiSummary(transcript, sentiment, mode, persona) {
         }
 
         # 文字起こしデータ
-        ${transcript}
+        ${combinedResults.fullTranscript}
       `;
       break;
     case 'thinking':
+      let thinkingPersonaPromptPart = '優秀な壁打ち相手';
+      if (persona && persona.trim() !== '') {
+        thinkingPersonaPromptPart = persona.trim();
+      }
       prompt = `
-        あなたは優秀な壁打ち相手です。
+        あなたは${thinkingPersonaPromptPart}です。
         以下の思考の独り言の「文字起こしデータ」を要約し、必ず以下「出力形式」のJSON形式にのみ従って出力してください。
 
         # ルール
         - 全てのキーと文字列の値は、必ずダブルクォーテーション("")で囲んでください。
-        - 評価値は1から100の整数で表現してください。
         - key_points: キーポイントを3つ、箇条書きの配列で
         - new_ideas: そこから発展する可能性のある新しいアイデアを3つ、箇条書きの配列で
         - summary_text: セッション全体の要約を、美しい比喩を用いながら800字以内で記述
@@ -171,9 +255,9 @@ async function getGeminiSummary(transcript, sentiment, mode, persona) {
           "new_ideas": ["<string>"],
           "summary_text": "<string>"
         }
-        
+      
         # 文字起こしデータ
-        ${transcript}
+        ${combinedResults.fullTranscript}
       `;
       break;
     case 'presenter':
@@ -185,28 +269,28 @@ async function getGeminiSummary(transcript, sentiment, mode, persona) {
 
       prompt =  `
         あなたは${personaPromptPart}です。
-        以下の「文字起こしデータ」と、その内容の「感情分析スコア」を総合的に分析し、
-        必ず以下「出力形式」のJSON形式にのみ従って評価を出力してください。
+        以下の「分析データ」と「文字起こしデータ」を総合的に分析し、評価を出力してください。
 
         # ルール
         - 全てのキーと文字列の値は、必ずダブルクォーテーション("")で囲んでください。
         - 評価値は1から100の整数で表現してください。
         - highlight: 最も良かった点を含めて800字以内で記述
         - advice: 改善点を800字以内で記述
-        - 文字起こしデータから、話速(1分あたりの平均文字数)と、フィラーワード(「えーっと」「あのー」など)の出現回数を正確に分析してください。
-          (それぞれ analysis.speaking_rate と analysis.filler_words_count に格納)
+        - 必ず「出力形式」のJSON形式にのみ従ってください。
 
-        # 感情分析スコアについて
-        - score: テキスト全体のポジティブ度(-1.0~1.0)。高いほど熱意がありポジティブ。
-        - magnitude: テキスト全体の感情の大きさ。大きいほど感情豊か。
-        - sentimentResult: ${JSON.stringify(sentiment)}
+        # 分析データ
+        - 平均話速: ${Math.round(combinedResults.speakingRate)} 文字/分
+        - 2秒以上の間の回数: ${combinedResults.longPauseCount} 回
+        - フィラーワードの回数: ${combinedResults.fillerWordCount} 回
+        - 感情分析スコア: ${JSON.stringify(sentiment)}
 
         # 評価基準
-        - 明朗さ: 話し方が明確で論理的か。
-        - 情熱度: 話し方から熱意が感じられるか。上記の感情分析スコアを最重視して評価してください。
+        - 上記の「分析データ」を最重要の客観的指標として扱い、評価スコアを決定してください。
+        - 明朗さ: 「フィラーワードの回数」が少ないほど高評価になります。
+        - 情熱度: 「感情分析スコア」を最重視して評価してください。
         - 示唆度: 内容に深みや有益な情報があるか。
-        - 構成力: 全体の流れがスムーズか。
-        - 自信: よどみなく堂々と話せているか。
+        - 構成力: 「2秒以上の間の回数」が適切に使われているかを評価してください。
+        - 自信: 「平均話速」が適切（早すぎず、遅すぎない）かを評価してください。
 
         # 出力形式 (JSON)
         {
@@ -218,28 +302,38 @@ async function getGeminiSummary(transcript, sentiment, mode, persona) {
             "confidence": <number>
           },
           "highlight": "<string>",
-          "advice": "<string>",
-          "analysis": {
-            "speaking_rate": <number>,
-            "filler_words_count": <number>
-          }
+          "advice": "<string>"
         }
 
         # 文字起こしデータ
-        ${transcript}
+        ${combinedResults.fullTranscript}
       `;
   }
 
   try {
     const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
     const data = await response.json();
+
     if (data.candidates && data.candidates.length > 0) {
       const jsonString = data.candidates[0].content.parts[0].text;
       console.log("Gemini Summary API応答:", jsonString);
 
       const match = jsonString.match(/\{[\s\S]*\}/);
       if (match) {
-        return JSON.parse(match[0]);
+        const geminiResult = JSON.parse(match[0]);
+
+        // ▼▼▼ Geminiの結果と、計算済みの分析データを合体させる ▼▼▼
+        const finalSummary = {
+          scores: geminiResult.scores,
+          highlight: geminiResult.highlight,
+          advice: geminiResult.advice,
+          analysis: { // analysisオブジェクトをここで追加
+            speaking_rate: Math.round(combinedResults.speakingRate),
+            long_pause_count: combinedResults.longPauseCount,
+            filler_words_count: combinedResults.fillerWordCount
+          }
+        };
+        return finalSummary;
       }
     }
   } catch (error) {
@@ -261,21 +355,37 @@ functions.http('coachApi', async (req, res) => {
       const { audioContent, imageContent, videoFrameContent } = req.body;
 
       // ▼▼▼ 音声文字起こしと表情分析を並行して実行 ▼▼▼
-      const [transcript, facialFeedback] = await Promise.all([
+      const [analysisData, facialFeedback] = await Promise.all([
         transcribeAudio(audioContent),
         analyzeVideoFrame(videoFrameContent)
       ]);
 
+      const transcript = analysisData ? analysisData.fullTranscript : null;
       const feedback = await getGeminiVisionFeedback(transcript, imageContent, mode, history || [], facialFeedback, persona);
-      res.status(200).send({ transcript, feedback });
+      res.status(200).send({ transcript, feedback, analysisData });
 
     } else if (type === 'summary-report') {
       // サマリーレポート処理
-      const { transcript } = req.body;
-      const sentiment = await analyzeTextSentiment(transcript);
-      const summary = await getGeminiSummary(transcript, sentiment, mode, persona);
+      const { analysisResults } = req.body;
+
+      // ▼▼▼ チャンクごとの分析結果を一つに統合する ▼▼▼
+      const combinedResults = {
+        fullTranscript: analysisResults.map(r => r.fullTranscript).join(' '),
+        duration: analysisResults.reduce((sum, r) => sum + r.duration, 0),
+        speakingRate: analysisResults.reduce((sum, r) => sum + r.speakingRate * r.duration, 0) / analysisResults.reduce((sum, r) => sum + r.duration, 0), // 加重平均
+        longPauseCount: analysisResults.reduce((sum, r) => sum + r.longPauseCount, 0),
+        fillerWordCount: analysisResults.reduce((sum, r) => sum + r.fillerWordCount, 0),
+      };
+
+      // speakingRateがNaNになるのを防ぐ
+      if (isNaN(combinedResults.speakingRate)) {
+        combinedResults.speakingRate = 0;
+      }
+
+      const sentiment = await analyzeTextSentiment(combinedResults.fullTranscript);
+      const summary = await getGeminiSummary(combinedResults, sentiment, mode, persona);
+
       res.status(200).send(summary);
-      
     } else {
       res.status(400).send('Invalid request type');
     }
@@ -301,13 +411,10 @@ async function transcribeAudio(audioContent) {
     // response には文字起こし結果とタイムスタンプの両方が含まれる
     console.log("Speech-to-Text 詳細応答:", JSON.stringify(response, null, 2));
 
-    const transcription = response.results
-      .map(result => result.alternatives[0].transcript)
-      .join('\n');
+    const analysisData = analyzeTranscriptionResults(response.results);
+    console.log("発話分析データ:", analysisData);
 
-    console.log(`Speech-to-Text書き起こし: ${transcription}`);
-
-    return transcription;
+    return analysisData;
   } catch (error) {
     console.error('Speech-to-Text APIエラー:', error);
     return null;
