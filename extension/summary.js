@@ -6,10 +6,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // モードに応じて表示を切り替える
     if (mode === 'presenter' || mode === 'creator') {
       // プレゼンター/クリエイターモードの処理
+      document.getElementById('totalScoreValue').textContent = data.totalScore;
       document.getElementById('rating-summary').style.display = 'block';
       
       document.getElementById('highlight').textContent = data.highlight;
       document.getElementById('advice').textContent = data.advice;
+
+      document.getElementById('personaComment').textContent = data.persona_comment;
       
       // レーダーチャートのラベルをモードに応じて変更
       const labels = (mode === 'presenter')

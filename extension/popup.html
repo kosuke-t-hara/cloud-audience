@@ -11,7 +11,6 @@
     /* === 変数定義 === */
     :root {
       --primary-color: #6750A4;
-      /* Material Design 3 の紫を基調に */
       --secondary-color: #E8DEF8;
       --text-color: #1D1B20;
       --surface-color: #FEF7FF;
@@ -51,7 +50,6 @@
 
     .mode-selection input[type="radio"] {
       display: none;
-      /* ラジオボタン自体は非表示 */
     }
 
     .mode-selection label {
@@ -74,7 +72,6 @@
       margin-bottom: 4px;
     }
 
-    /* 選択された時のスタイル */
     .mode-selection input[type="radio"]:checked+label {
       background-color: var(--secondary-color);
       border-color: var(--primary-color);
@@ -85,9 +82,7 @@
       margin-bottom: 16px;
     }
 
-    #presenter-persona-input label {
-      display: block;
-      text-align: left;
+    #presenter-persona-input .setting-label {
       font-size: 14px;
       font-weight: 500;
       margin-bottom: 8px;
@@ -96,19 +91,62 @@
     #presenter-persona-input textarea {
       width: 100%;
       box-sizing: border-box;
-      /* paddingとborderをwidthに含める */
       padding: 10px;
       border: 1px solid var(--outline-color);
       border-radius: 8px;
       font-family: var(--body-font);
       resize: vertical;
     }
+    
+    /* === セクションの共通スタイル === */
+    .setting-section {
+      margin-bottom: 16px;
+    }
+    .setting-label {
+      display: block;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    /* ▼▼▼ ここからフィードバック方法のスタイルをまるごと追加 ▼▼▼ */
+    .feedback-mode-selection {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    .feedback-mode-selection input[type="radio"] {
+      display: none;
+    }
+
+    .feedback-mode-selection label {
+      flex-grow: 1; /* ラベルが均等に幅を持つように */
+      text-align: center;
+      padding: 8px 10px;
+      border: 1px solid var(--outline-color);
+      border-radius: 20px; /* 角を丸くしてチップ形状に */
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+    }
+    
+    .feedback-mode-selection input[type="radio"]:checked + label {
+      background-color: var(--secondary-color);
+      border-color: var(--primary-color);
+      color: var(--primary-color);
+    }
+    /* ▲▲▲ ここまで追加 ▲▲▲ */
+
 
     /* === アクションボタン === */
     .action-buttons {
       display: flex;
       flex-direction: column;
       gap: 8px;
+      margin-top: 24px; /* ボタンの上の余白を少し広げる */
     }
 
     .action-buttons button {
@@ -176,18 +214,18 @@
   </div>
 
   <div id="presenter-persona-input" style="display: none;">
-    <label for="persona-text">ペルソナ設定（任意）</label>
+    <label for="persona-text" class="setting-label">ペルソナ設定（任意）</label>
     <textarea id="persona-text" rows="3" placeholder="例：この企画に投資するか判断する投資家"></textarea>
   </div>
 
   <div class="setting-section">
-    <label class="setting-label">フィードバック方法:</label>
+    <label class="setting-label">フィードバック方法</label>
     <div class="feedback-mode-selection">
       <input type="radio" id="fb-realtime" name="feedback_mode" value="realtime" checked>
       <label for="fb-realtime">リアルタイム</label>
 
       <input type="radio" id="fb-badge" name="feedback_mode" value="badge">
-      <label for="fb-badge">バッジで通知</label>
+      <label for="fb-badge">バッジ通知</label>
 
       <input type="radio" id="fb-summary" name="feedback_mode" value="summary">
       <label for="fb-summary">サマリーのみ</label>

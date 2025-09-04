@@ -217,7 +217,8 @@ async function generateSummary(analysisResults) {
       body: JSON.stringify({
         type: 'summary-report',
         analysisResults: analysisResults,
-        mode: currentMode
+        mode: currentMode,
+        persona: currentPersona,
       })
     });
 

@@ -1,25 +1,82 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <title>プレゼンテーション サマリー</title>
   <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
-    h1, h2 { border-bottom: 2px solid #4285F4; padding-bottom: 10px; }
-    .card { background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-    #chart-container { width: 70%; max-width: 500px; margin: 20px auto; }
+    body {
+      font-family: sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    h1,
+    h2 {
+      border-bottom: 2px solid #4285F4;
+      padding-bottom: 10px;
+    }
+
+    .card {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    #chart-container {
+      width: 70%;
+      max-width: 500px;
+      margin: 20px auto;
+    }
+
+    .total-score-container {
+      text-align: center;
+      margin-bottom: 20px;
+      background-color: #f8f9fa;
+      border-radius: 12px;
+      padding: 10px 20px;
+    }
+
+    .total-score-container h2 {
+      border-bottom: none;
+      margin-bottom: 0;
+      font-size: 1.2em;
+      color: #5f6368;
+    }
+
+    .score-value {
+      font-size: 3.5em;
+      font-weight: bold;
+      color: #4285F4;
+      /* Google Blue */
+      margin-top: 5px;
+    }
+
+    .persona-comment-card {
+      background-color: #e8def8; /* 紫色の薄い背景 */
+      border: 1px solid #6750A4; /* 紫色のボーダー */
+    }
   </style>
   <script src="./lib/chart.umd.js"></script>
 </head>
+
 <body>
   <h1>サマリーレポート</h1>
-  
+
   <div id="rating-summary" style="display: none;">
+    <div class="total-score-container">
+      <h2>Total Score</h2>
+      <p class="score-value" id="totalScoreValue">0</p>
+    </div>
+
     <h2>総合評価</h2>
     <div id="chart-container">
       <canvas id="radarChart"></canvas>
     </div>
-    
+
     <h2>音声分析</h2>
     <div class="card">
       <p><strong>平均話速:</strong> <span id="speaking-rate"></span> 文字/分</p>
@@ -30,6 +87,11 @@
     <div class="card" id="highlight"></div>
     <h2><span style="color: #fbbc05;">💡</span> ワンポイントアドバイス</h2>
     <div class="card" id="advice"></div>
+
+    <h2>ペルソナからの総評</h2>
+    <div class="card persona-comment-card">
+      <p id="personaComment"></p>
+    </div>
   </div>
 
   <div id="thinking-summary" style="display: none;">
@@ -50,4 +112,5 @@
 
   <script src="summary.js"></script>
 </body>
+
 </html>

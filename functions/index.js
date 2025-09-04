@@ -64,10 +64,14 @@ function analyzeTranscriptionResults(results) {
   }
 
   // 4. フィラーワードの回数をカウント
-  const fillerWords = ["あの", "えー", "えーっと", "まあ", "なんか", "こう"];
+  const fillerWords = [
+    "あの", "あー", "えー", "えーっと", "えっと", "えーと", 
+    "まあ", "なんか", "こう", "その", "ええと", "んと"
+  ];
   let fillerWordCount = 0;
   allWords.forEach(wordInfo => {
-    if (fillerWords.includes(wordInfo.word)) {
+    // wordInfo.word に含まれるフィラーワードをチェック (例：「あのー」も「あの」としてカウント)
+    if (fillerWords.some(filler => wordInfo.word.startsWith(filler))) {
       fillerWordCount++;
     }
   });
@@ -132,7 +136,7 @@ async function getGeminiVisionFeedback(text, image, mode, history, facialFeedbac
       };
       break;
     case 'thinking':
-      prompt = `あなたは優秀な聞き手です。発話者の「${text}」という発言内容を肯定的に受け止め、「なるほど」「面白いですね」といった短い相槌か、思考を促すための「それは具体的には？」のような短い質問を一つ生成してください。${facialPromptPart}`;
+      prompt = `あなたは優秀な聞き手です。発話者の「${text}」という発言内容を肯定的に受け止め、短い相槌か、思考を促すための質問を一つ生成してください。${facialPromptPart}`;
       requestBody = {
         contents: [{ parts: [
           { text: prompt },
@@ -146,8 +150,9 @@ async function getGeminiVisionFeedback(text, image, mode, history, facialFeedbac
       if (persona && persona.trim() !== '') {
         personaPromptPart = persona.trim();
       }
+      console.log("使用するペルソナ:", personaPromptPart);
 
-      prompt = `あなたは${personaPromptPart}です。このスライド画像と、発表者の「${text}」という発言内容を踏まえ、160文字以内でコメントか質問を生成してください。${facialPromptPart}`;
+      prompt = `あなたは${personaPromptPart}です。この画像と、発話者の「${text}」という発言内容を踏まえ、160文字以内でコメントか質問を生成してください。${facialPromptPart}`;
       requestBody = {
         contents: [{ parts: [
           { text: prompt },
@@ -192,6 +197,8 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
       if (persona && persona.trim() !== '') {
         creatorPersonaPromptPart = persona.trim();
       }
+      console.log("使用するペルソナ:", creatorPersonaPromptPart);
+
       prompt = `
         あなたは${creatorPersonaPromptPart}です。
         以下の「分析データ」と「文字起こしデータ」を総合的に分析し、評価を出力してください。
@@ -201,6 +208,7 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
         - 評価値は1から100の整数で表現してください。
         - highlight: 最も良かった点を含めて800字以内で記述
         - advice: 改善点を800字以内で記述
+        - 最後に、あなたは「${personaPromptPart}」の役割に完全になりきり、発話全体への総評を persona_comment として800字以内で記述してください。
         - 必ず「出力形式」のJSON形式にのみ従ってください。
 
         # 分析データ
@@ -227,7 +235,8 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
             "safety_risk": <number>
           },
           "highlight": "<string>",
-          "advice": "<string>"
+          "advice": "<string>",
+          "persona_comment": "<string>" 
         }
 
         # 文字起こしデータ
@@ -266,6 +275,7 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
       if (persona && persona.trim() !== '') {
         personaPromptPart = persona.trim();
       }
+      console.log("使用するペルソナ:", personaPromptPart);
 
       prompt =  `
         あなたは${personaPromptPart}です。
@@ -276,6 +286,7 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
         - 評価値は1から100の整数で表現してください。
         - highlight: 最も良かった点を含めて800字以内で記述
         - advice: 改善点を800字以内で記述
+        - 最後に、あなたは「${personaPromptPart}」という設定に完全になりきり、発話全体への総評を persona_comment として800字以内で記述してください。
         - 必ず「出力形式」のJSON形式にのみ従ってください。
 
         # 分析データ
@@ -286,11 +297,11 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
 
         # 評価基準
         - 上記の「分析データ」を最重要の客観的指標として扱い、評価スコアを決定してください。
-        - 明朗さ: 「フィラーワードの回数」が少ないほど高評価になります。
+        - 明朗さ: 話し方が明確で論理的か。「フィラーワードの回数」を厳格に評価してください。例えば、5回以上でスコアは70点以下、10回以上でスコアは40点以下のように、回数に応じて明確にスコアを下げてください。
         - 情熱度: 「感情分析スコア」を最重視して評価してください。
-        - 示唆度: 内容に深みや有益な情報があるか。
-        - 構成力: 「2秒以上の間の回数」が適切に使われているかを評価してください。
-        - 自信: 「平均話速」が適切（早すぎず、遅すぎない）かを評価してください。
+        - 示唆度: 内容に深みや有益な情報があるかで評価してください。
+        - 構成力: 「2秒以上の間の回数」が適切に使われているかを含めて評価してください。
+        - 自信: 「平均話速」が適切（早すぎず、遅すぎない）かを含めて評価してください。
 
         # 出力形式 (JSON)
         {
@@ -302,7 +313,8 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
             "confidence": <number>
           },
           "highlight": "<string>",
-          "advice": "<string>"
+          "advice": "<string>",
+          "persona_comment": "<string>" 
         }
 
         # 文字起こしデータ
@@ -322,6 +334,14 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
       if (match) {
         const geminiResult = JSON.parse(match[0]);
 
+        // ▼▼▼ ここから合計点を計算して追加 ▼▼▼
+        let totalScore = 0;
+        // scoresオブジェクトが存在し、キーが1つ以上あることを確認
+        if (geminiResult.scores && Object.keys(geminiResult.scores).length > 0) {
+          // Object.values()でスコアの数値だけを配列として取得し、reduceで合計
+          totalScore = Object.values(geminiResult.scores).reduce((sum, score) => sum + score, 0);
+        }
+
         // ▼▼▼ Geminiの結果と、計算済みの分析データを合体させる ▼▼▼
         const finalSummary = {
           scores: geminiResult.scores,
@@ -331,7 +351,9 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
             speaking_rate: Math.round(combinedResults.speakingRate),
             long_pause_count: combinedResults.longPauseCount,
             filler_words_count: combinedResults.fillerWordCount
-          }
+          },
+          totalScore: totalScore,
+          persona_comment: geminiResult.persona_comment
         };
         return finalSummary;
       }
