@@ -294,13 +294,19 @@ async function transcribeAudio(audioContent) {
         sampleRateHertz: 48000,
         languageCode: 'ja-JP',
         model: 'latest_long',
+        enableWordTimeOffsets: true, // 単語の開始・終了時間を取得
       },
     };
     const [response] = await speechClient.recognize(request);
+    // response には文字起こし結果とタイムスタンプの両方が含まれる
+    console.log("Speech-to-Text 詳細応答:", JSON.stringify(response, null, 2));
+
     const transcription = response.results
       .map(result => result.alternatives[0].transcript)
       .join('\n');
+
     console.log(`Speech-to-Text書き起こし: ${transcription}`);
+
     return transcription;
   } catch (error) {
     console.error('Speech-to-Text APIエラー:', error);

@@ -1,50 +1,173 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <title>Prezento AI Coach</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    body { width: 500px; font-family: sans-serif; text-align: center; }
-    h3 { margin-bottom: 10px; }
-    button { width: 80%; padding: 10px; margin-top: 15px; font-size: 14px; cursor: pointer; border: none; }
-    #startButton { background-color: #4285F4; color: white; }
-    #stopButton { background-color: #DB4437; color: white; }
-    .mode-selection { display: flex; justify-content: space-around; padding: 10px; border-top: 1px solid #eee; border-bottom: 1px solid #eee; }
-    .mode-selection label { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
-    .mode-selection span { font-size: 24px; } /* Emoji size */
+    /* === 変数定義 === */
+    :root {
+      --primary-color: #6750A4; /* Material Design 3 の紫を基調に */
+      --secondary-color: #E8DEF8;
+      --text-color: #1D1B20;
+      --surface-color: #FEF7FF;
+      --outline-color: #CAC4D0;
+      --body-font: 'Noto Sans JP', sans-serif;
+    }
+
+    /* === 全体スタイル === */
+    body {
+      width: 320px;
+      font-family: var(--body-font);
+      color: var(--text-color);
+      background-color: var(--surface-color);
+      margin: 0;
+      padding: 16px;
+    }
+
+    /* === ヘッダー === */
+    .header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .header h3 {
+      font-weight: 500;
+      font-size: 18px;
+      margin: 0;
+    }
+
+    /* === モード選択 === */
+    .mode-selection {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .mode-selection input[type="radio"] {
+      display: none; /* ラジオボタン自体は非表示 */
+    }
+    .mode-selection label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 8px;
+      border: 1px solid var(--outline-color);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.2s, border-color 0.2s;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .mode-selection label .icon {
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+    /* 選択された時のスタイル */
+    .mode-selection input[type="radio"]:checked + label {
+      background-color: var(--secondary-color);
+      border-color: var(--primary-color);
+    }
+    
+    /* === ペルソナ入力欄 === */
+    #presenter-persona-input {
+      margin-bottom: 16px;
+    }
+    #presenter-persona-input label {
+      display: block;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    #presenter-persona-input textarea {
+      width: 100%;
+      box-sizing: border-box; /* paddingとborderをwidthに含める */
+      padding: 10px;
+      border: 1px solid var(--outline-color);
+      border-radius: 8px;
+      font-family: var(--body-font);
+      resize: vertical;
+    }
+
+    /* === アクションボタン === */
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .action-buttons button {
+      width: 100%;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      border-radius: 16px;
+      transition: background-color 0.2s;
+    }
+    #startButton {
+      background-color: var(--primary-color);
+      color: white;
+    }
+    #startButton:hover {
+      opacity: 0.9;
+    }
+    #stopButton {
+      background-color: #F8F8F8;
+      color: var(--primary-color);
+      border: 1px solid var(--outline-color);
+    }
+    #stopButton:hover {
+      background-color: #EFEFEF;
+    }
+
   </style>
 </head>
 <body>
-  <h3>Prezento AI Coach</h3>
-  
-  <div class="mode-selection">
-    <label>
-      <input type="radio" name="mode" value="presenter" checked>
-      <span>👔</span>
-      プレゼンター
-    </label>
-    <div id="presenter-persona-input" style="margin-top: 5px;">
-      <label for="persona-text" style="font-size: 0.9em;">ペルソナ（任意）:</label>
-      <textarea id="persona-text" rows="3" style="width: 95%;" placeholder="この企画に投資するか判断する投資家"></textarea>
-    </div>
-    <label>
-      <input type="radio" name="mode" value="creator">
-      <span>🎬</span>
-      クリエイター
-    </label>
-    <label>
-      <input type="radio" name="mode" value="thinking">
-      <span>🧠</span>
-      思考パートナー
-    </label>
-    <label>
-      <input type="radio" name="mode" value="dialogue">
-      <span>💬</span>
-      対話シミュレーター
-    </label>
+
+  <div class="header">
+    <h3>Prezento AI Coach</h3>
   </div>
 
-  <button id="startButton">練習を開始</button>
-  <button id="stopButton">練習を終了</button>
+  <div class="mode-selection">
+    <input type="radio" id="mode-presenter" name="mode" value="presenter" checked>
+    <label for="mode-presenter">
+      <span class="icon">👔</span>
+      プレゼンター
+    </label>
+    
+    <input type="radio" id="mode-creator" name="mode" value="creator">
+    <label for="mode-creator">
+      <span class="icon">🎬</span>
+      クリエイター
+    </label>
+    
+    <input type="radio" id="mode-thinking" name="mode" value="thinking">
+    <label for="mode-thinking">
+      <span class="icon">🧠</span>
+      思考パートナー
+    </label>
+    
+    <input type="radio" id="mode-dialogue" name="mode" value="dialogue">
+    <label for="mode-dialogue">
+      <span class="icon">💬</span>
+      対話シミュ
+    </label>
+  </div>
+  
+  <div id="presenter-persona-input" style="display: none;">
+    <label for="persona-text">ペルソナ設定（任意）</label>
+    <textarea id="persona-text" rows="3" placeholder="例：この企画に投資するか判断する投資家"></textarea>
+  </div>
+
+  <div class="action-buttons">
+    <button id="startButton">練習を開始</button>
+    <button id="stopButton">練習を終了</button>
+  </div>
   
   <script src="popup.js"></script>
 </body>
