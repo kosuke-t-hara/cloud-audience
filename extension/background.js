@@ -7,6 +7,7 @@ let isRecording = false;
 let fullTranscript = ""; // 全文を保存する変数
 let targetTabId = null;
 let currentMode = 'presenter'; //
+let currentPersona = null;
 let conversationHistory = []; // 会話履歴
 let latestVideoFrame = null; // 最新のカメラ映像を保存する変数
 
@@ -22,8 +23,9 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
-function startRecording(mode) {
+function startRecording(mode, persona) {
   currentMode = mode;
+  currentPersona = persona; // ペルソナを保存
   isRecording = true;
   fullTranscript = ""; // 練習開始時にリセット
   conversationHistory = []; // 会話履歴をリセット
@@ -87,8 +89,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'audio_chunk') {
-    handleAudioChunk(request.data, currentMode);
-    return true;
+    handleAudioChunk(request.data);
+    return;
   } 
   
   if (request.type === 'mic_error') {
@@ -101,18 +103,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // ポップアップからの開始/停止リクエストを処理
   if (request.action === "start") {
     console.log("練習を開始します。");
-    startRecording(request.mode);
+    startRecording(request.mode, request.persona);
     sendResponse({ message: "練習を開始しました。" });
   } else if (request.action === "stop") {
     stopRecording();
     sendResponse({ message: "練習を停止しました。" });
   }
   
-  // 非同期処理を示すためにtrueを返す
-  return true;
+  return;
 });
 
-async function handleAudioChunk(audioContent, mode) {
+async function handleAudioChunk(audioContent) {
+  console.log("音声チャンクを処理中...");
+
   try {
     const screenshot = await captureVisibleTab();
     const response = await fetch(CLOUD_FUNCTION_URL, {
@@ -120,7 +123,8 @@ async function handleAudioChunk(audioContent, mode) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'realtime-feedback',
-        mode: mode,
+        mode: currentMode,
+        persona: currentPersona,
         audioContent: audioContent,
         imageContent: screenshot.split(',')[1],
         videoFrameContent: latestVideoFrame, 

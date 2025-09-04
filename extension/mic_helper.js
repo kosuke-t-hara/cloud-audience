@@ -24,6 +24,21 @@
 
     const recorder = new MediaRecorder(audioOnlyStream, { mimeType: 'audio/webm' });
 
+    // 録音の最大時間を設定
+    const MAX_RECORDING_DURATION = 55000; // 55秒に設定 (API制限の60秒より短く)
+    let recordingTimer; // タイマーを保持する変数
+
+    recorder.onstart = () => {
+      console.log("録音チャンクを開始しました。");
+      // 録音開始時に、最大録音時間を超えたら停止するタイマーをセット
+      recordingTimer = setTimeout(() => {
+        if (recorder.state === 'recording') {
+          console.log("最大録音時間に達したため、音声を区切ります。");
+          recorder.stop();
+        }
+      }, MAX_RECORDING_DURATION);
+    };
+
     // 5秒ごとに音声を区切ってbackground.jsへ送信
     const audioContext = new AudioContext();
     const source = audioContext.createMediaStreamSource(audioOnlyStream);
@@ -65,7 +80,7 @@
       analyser.getByteFrequencyData(dataArray);
       let sum = dataArray.reduce((a, b) => a + b, 0);
 
-      console.log("現在の音量レベル:", sum);
+      // console.log("現在の音量レベル:", sum);
 
       if (sum < SILENCE_THRESHOLD) {
         if (performance.now() - silenceStart > PAUSE_DURATION) {
@@ -82,6 +97,8 @@
     }
 
     recorder.ondataavailable = (e) => {
+      console.log("音声チャンクを取得しました。サイズ:", e.data.size);
+
       if (e.data.size > 0) {
         // BlobデータをBase64に変換して送信
         const reader = new FileReader();
@@ -94,6 +111,9 @@
     };
 
     recorder.onstop = () => {
+      // (無音検知 or 時間制限のどちらで停止してもタイマーをクリア)
+      clearTimeout(recordingTimer);
+      
       // 停止したら、すぐに次の録音を開始
       if (audioOnlyStream.active) {
         recorder.start();

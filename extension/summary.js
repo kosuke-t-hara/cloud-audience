@@ -20,6 +20,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         ? [data.scores.clarity, data.scores.passion, data.scores.insightfulness, data.scores.structure, data.scores.confidence]
         : [data.scores.hook_strength, data.scores.entertainment, data.scores.pacing, data.scores.killer_phrase, data.scores.safety_risk];
 
+      if (data.analysis) {
+        document.getElementById('speaking-rate').textContent = data.analysis.speaking_rate;
+        document.getElementById('filler-words-count').textContent = data.analysis.filler_words_count;
+      }
+
       const ctx = document.getElementById('radarChart').getContext('2d');
       new Chart(ctx, {
         type: 'radar',

@@ -17,7 +17,7 @@ const languageClient = new LanguageServiceClient();
 const visionClient = new ImageAnnotatorClient();
 
 // Gemini Vision関数 (リアルタイムフィードバック用)
-async function getGeminiVisionFeedback(text, image, mode, history, facialFeedback) {
+async function getGeminiVisionFeedback(text, image, mode, history, facialFeedback, persona) {
   if (!text) return null;
 
   // ▼▼▼ 表情分析の結果をプロンプトに含めるための準備 ▼▼▼
@@ -77,7 +77,12 @@ async function getGeminiVisionFeedback(text, image, mode, history, facialFeedbac
       break;
     case 'presenter':
     default:
-      prompt = `あなたは冷静なプレゼンの聴衆です。このスライド画像と、発表者の「${text}」という発言内容を踏まえ、80文字以内で短いコメントを一つだけ生成してください。${facialPromptPart}`;
+      let personaPromptPart = '冷静なプレゼンの聴衆';
+      if (persona && persona.trim() !== '') {
+        personaPromptPart = persona.trim();
+      }
+
+      prompt = `あなたは${personaPromptPart}です。このスライド画像と、発表者の「${text}」という発言内容を踏まえ、160文字以内でコメントか質問を生成してください。${facialPromptPart}`;
       requestBody = {
         contents: [{ parts: [
           { text: prompt },
@@ -112,7 +117,7 @@ async function getGeminiVisionFeedback(text, image, mode, history, facialFeedbac
 }
 
 // Gemini Summary関数 (サマリーレポート用)
-async function getGeminiSummary(transcript, sentiment, mode) {
+async function getGeminiSummary(transcript, sentiment, mode, persona) {
   const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}`;
 
   let prompt;
@@ -173,8 +178,13 @@ async function getGeminiSummary(transcript, sentiment, mode) {
       break;
     case 'presenter':
     default:
+      let personaPromptPart = '経験豊富なプレゼンテーションのコーチ';
+      if (persona && persona.trim() !== '') {
+        personaPromptPart = persona.trim();
+      }
+
       prompt =  `
-        あなたは経験豊富なプレゼンテーションのコーチです。
+        あなたは${personaPromptPart}です。
         以下の「文字起こしデータ」と、その内容の「感情分析スコア」を総合的に分析し、
         必ず以下「出力形式」のJSON形式にのみ従って評価を出力してください。
 
@@ -183,6 +193,8 @@ async function getGeminiSummary(transcript, sentiment, mode) {
         - 評価値は1から100の整数で表現してください。
         - highlight: 最も良かった点を含めて800字以内で記述
         - advice: 改善点を800字以内で記述
+        - 文字起こしデータから、話速(1分あたりの平均文字数)と、フィラーワード(「えーっと」「あのー」など)の出現回数を正確に分析してください。
+          (それぞれ analysis.speaking_rate と analysis.filler_words_count に格納)
 
         # 感情分析スコアについて
         - score: テキスト全体のポジティブ度(-1.0~1.0)。高いほど熱意がありポジティブ。
@@ -206,7 +218,11 @@ async function getGeminiSummary(transcript, sentiment, mode) {
             "confidence": <number>
           },
           "highlight": "<string>",
-          "advice": "<string>"
+          "advice": "<string>",
+          "analysis": {
+            "speaking_rate": <number>,
+            "filler_words_count": <number>
+          }
         }
 
         # 文字起こしデータ
@@ -238,7 +254,7 @@ functions.http('coachApi', async (req, res) => {
       return res.status(405).send('Method Not Allowed');
     }
 
-    const { type, mode, history } = req.body;
+    const { type, mode, history, persona } = req.body;
 
     if (type === 'realtime-feedback') {
       // リアルタイムフィードバック処理
@@ -250,14 +266,14 @@ functions.http('coachApi', async (req, res) => {
         analyzeVideoFrame(videoFrameContent)
       ]);
 
-      const feedback = await getGeminiVisionFeedback(transcript, imageContent, mode, history || [], facialFeedback);
+      const feedback = await getGeminiVisionFeedback(transcript, imageContent, mode, history || [], facialFeedback, persona);
       res.status(200).send({ transcript, feedback });
 
     } else if (type === 'summary-report') {
       // サマリーレポート処理
       const { transcript } = req.body;
       const sentiment = await analyzeTextSentiment(transcript);
-      const summary = await getGeminiSummary(transcript, sentiment, mode);
+      const summary = await getGeminiSummary(transcript, sentiment, mode, persona);
       res.status(200).send(summary);
       
     } else {
@@ -317,19 +333,19 @@ async function analyzeVideoFrame(videoFrameContent) {
 
       // 喜びの感情が「ありそう(LIKELY)」以上の場合にフィードバックを生成
       if (likelihoods.indexOf(face.joyLikelihood) >= 4) {
-        return "話者は喜びに満ちた、とても良い表情をしています";
+        return "笑顔、あるいは喜びの表情";
       }
       // 驚きの感情が「ありそう(LIKELY)」以上の場合
       if (likelihoods.indexOf(face.surpriseLikelihood) >= 4) {
-        return "話者は何かに驚いているような表情です";
+        return "驚いている表情";
       }
       // 悲しみの感情が「ありそう(LIKELY)」以上の場合
       if (likelihoods.indexOf(face.sorrowLikelihood) >= 4) {
-        return "話者は少し悲しそうな、あるいは心配そうな表情に見えます";
+        return "悲しそう、あるいは心配そうな表情";
       }
       
       // 特に強い感情がなければ、ニュートラルなフィードバック
-      return "話者は落ち着いた表情です";
+      return "落ち着いた表情です";
     }
     return "表情は検出されませんでした";
   } catch (error) {
