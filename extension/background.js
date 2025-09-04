@@ -11,6 +11,7 @@ let currentPersona = null;
 let conversationHistory = []; // 会話履歴
 let latestVideoFrame = null; // 最新のカメラ映像を保存する変数
 let sessionAnalysisResults = []; // 分析結果を蓄積する配列
+let currentFeedbackMode = 'realtime'; // フィードバックモード
 
 // ショートカットキーのリスナー
 chrome.commands.onCommand.addListener((command) => {
@@ -18,19 +19,33 @@ chrome.commands.onCommand.addListener((command) => {
     // 1. ストレージからモードを読み込む
     chrome.storage.local.get(['lastMode'], (result) => {
       // 保存されたモードがなければ 'presenter' をデフォルトにする
-      const mode = result.lastMode || 'presenter';   
-      isRecording ? stopRecording() : startRecording(mode);
+      const mode = result.lastMode || 'presenter';
+
+      chrome.storage.local.get(['lastPersona'], (result) => {
+        // 保存されたペルソナがなければ null をデフォルトにする
+        const persona = result.lastPersona || null;
+
+        chrome.storage.local.get(['lastFeedbackMode'], (result) => {
+          // 保存されたフィードバックモードがなければ 'realtime' をデフォルトにする
+          const feedbackMode = result.lastFeedbackMode || 'realtime';
+          isRecording ? stopRecording() : startRecording(mode, persona, feedbackMode);
+        });
+      });
     });
   }
 });
 
-function startRecording(mode, persona) {
+function startRecording(mode, persona, feedbackMode) {
   currentMode = mode;
   currentPersona = persona; // ペルソナを保存
+  currentFeedbackMode = feedbackMode; // フィードバックモードを保存
   isRecording = true;
   fullTranscript = ""; // 練習開始時にリセット
   conversationHistory = []; // 会話履歴をリセット
   sessionAnalysisResults = []; // 分析結果をリセット
+
+  // 練習開始時にバッジをリセット
+  chrome.action.setBadgeText({ text: '' });
 
   // 練習開始時に、これから操作するタブのIDを取得して保存する
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -105,7 +120,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // ポップアップからの開始/停止リクエストを処理
   if (request.action === "start") {
     console.log("練習を開始します。");
-    startRecording(request.mode, request.persona);
+    startRecording(request.mode, request.persona, request.feedbackMode);
     sendResponse({ message: "練習を開始しました。" });
   } else if (request.action === "stop") {
     stopRecording();
@@ -149,13 +164,27 @@ async function handleAudioChunk(audioContent) {
 
       fullTranscript += data.transcript + " ";
 
-      // メッセージを送る直前に、アクティブなタブを取得する
-      if (targetTabId) {
-        // ステップ3: 注入完了後にメッセージを送信
-        chrome.tabs.sendMessage(targetTabId, { type: 'show-feedback', data: data.feedback });
-
-      } else {
-        console.error("フィードバック表示先のタブが見つかりません。");
+      // ▼▼▼ フィードバックモードに応じて処理を分岐 ▼▼▼
+      switch (currentFeedbackMode) {
+        case 'realtime':
+          // リアルタイムフィードバックの場合の処理
+          // メッセージを送る直前に、アクティブなタブを取得する
+          if (targetTabId) {
+            // ステップ3: 注入完了後にメッセージを送信
+            chrome.tabs.sendMessage(targetTabId, { type: 'show-feedback', data: data.feedback });
+          } else {
+            console.error("フィードバック表示先のタブが見つかりません。");
+          }
+          break;
+        case 'badge':
+          // バッジ表示の場合の処理
+          chrome.action.setBadgeText({ text: '💡' }); // 例として電球アイコン
+          chrome.action.setBadgeBackgroundColor({ color: '#FBC02D' }); // 黄色など
+          // TODO: ポップアップにフィードバック履歴を保存するロジックを追加
+          break;
+        case 'summary':
+          // 何もしない
+          break;
       }
     }
   } catch (error) {

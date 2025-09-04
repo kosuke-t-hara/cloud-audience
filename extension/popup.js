@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const modeRadios = document.querySelectorAll('input[name="mode"]');
   const presenterPersonaInput = document.getElementById('presenter-persona-input');
   const personaText = document.getElementById('persona-text');
+  const feedbackModeRadios = document.querySelectorAll('input[name="feedback_mode"]');
 
   // ▼▼▼ ラジオボタン変更時の表示制御を追加 ▼▼▼
   function togglePersonaInput() {
@@ -34,11 +35,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  // 起動時に、保存されたフィードバックモードを読み込んでUIに反映
+  chrome.storage.local.get(['lastFeedbackMode'], (result) => {
+    if (result.lastFeedbackMode) {
+      document.querySelector(`input[name="feedback_mode"][value="${result.lastFeedbackMode}"]`).checked = true;
+    }
+  });
+
   startButton.addEventListener('click', () => {
     // 選択されているモードを取得
     const selectedMode = document.querySelector('input[name="mode"]:checked').value;
     // プレゼンターモードの場合、ペルソナ設定を取得
     const persona = (selectedMode === 'presenter') ? personaText.value : null;
+    // 選択されているフィードバックモードを取得
+    const feedbackMode = document.querySelector('input[name="feedback_mode"]:checked').value;
 
     // 選択されたモードをストレージに保存
     chrome.storage.local.set({ lastMode: selectedMode }).then(() => {
@@ -50,11 +60,17 @@ document.addEventListener('DOMContentLoaded', function() {
       console.log(`ペルソナ「${persona}」を保存しました。`);
     });
 
+    // 選択されたフィードバックモードをストレージに保存
+    chrome.storage.local.set({ lastFeedbackMode: feedbackMode }).then(() => {
+      console.log(`フィードバックモード「${feedbackMode}」を保存しました。`);
+    });
+
     // background.jsへ、モード情報も一緒に送信する
     chrome.runtime.sendMessage({
       action: "start",
       mode: selectedMode,
-      persona: persona
+      persona: persona,
+      feedbackMode: feedbackMode
     }, (response) => {
       console.log(response?.message);
     });

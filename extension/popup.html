@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <title>Prezento AI Coach</title>
@@ -9,7 +10,8 @@
   <style>
     /* === 変数定義 === */
     :root {
-      --primary-color: #6750A4; /* Material Design 3 の紫を基調に */
+      --primary-color: #6750A4;
+      /* Material Design 3 の紫を基調に */
       --secondary-color: #E8DEF8;
       --text-color: #1D1B20;
       --surface-color: #FEF7FF;
@@ -32,6 +34,7 @@
       text-align: center;
       margin-bottom: 16px;
     }
+
     .header h3 {
       font-weight: 500;
       font-size: 18px;
@@ -45,9 +48,12 @@
       gap: 8px;
       margin-bottom: 16px;
     }
+
     .mode-selection input[type="radio"] {
-      display: none; /* ラジオボタン自体は非表示 */
+      display: none;
+      /* ラジオボタン自体は非表示 */
     }
+
     .mode-selection label {
       display: flex;
       flex-direction: column;
@@ -62,20 +68,23 @@
       font-size: 12px;
       font-weight: 500;
     }
+
     .mode-selection label .icon {
       font-size: 24px;
       margin-bottom: 4px;
     }
+
     /* 選択された時のスタイル */
-    .mode-selection input[type="radio"]:checked + label {
+    .mode-selection input[type="radio"]:checked+label {
       background-color: var(--secondary-color);
       border-color: var(--primary-color);
     }
-    
+
     /* === ペルソナ入力欄 === */
     #presenter-persona-input {
       margin-bottom: 16px;
     }
+
     #presenter-persona-input label {
       display: block;
       text-align: left;
@@ -83,9 +92,11 @@
       font-weight: 500;
       margin-bottom: 8px;
     }
+
     #presenter-persona-input textarea {
       width: 100%;
-      box-sizing: border-box; /* paddingとborderをwidthに含める */
+      box-sizing: border-box;
+      /* paddingとborderをwidthに含める */
       padding: 10px;
       border: 1px solid var(--outline-color);
       border-radius: 8px;
@@ -99,6 +110,7 @@
       flex-direction: column;
       gap: 8px;
     }
+
     .action-buttons button {
       width: 100%;
       padding: 12px;
@@ -109,24 +121,28 @@
       border-radius: 16px;
       transition: background-color 0.2s;
     }
+
     #startButton {
       background-color: var(--primary-color);
       color: white;
     }
+
     #startButton:hover {
       opacity: 0.9;
     }
+
     #stopButton {
       background-color: #F8F8F8;
       color: var(--primary-color);
       border: 1px solid var(--outline-color);
     }
+
     #stopButton:hover {
       background-color: #EFEFEF;
     }
-
   </style>
 </head>
+
 <body>
 
   <div class="header">
@@ -139,36 +155,51 @@
       <span class="icon">👔</span>
       プレゼンター
     </label>
-    
+
     <input type="radio" id="mode-creator" name="mode" value="creator">
     <label for="mode-creator">
       <span class="icon">🎬</span>
       クリエイター
     </label>
-    
+
     <input type="radio" id="mode-thinking" name="mode" value="thinking">
     <label for="mode-thinking">
       <span class="icon">🧠</span>
       思考パートナー
     </label>
-    
+
     <input type="radio" id="mode-dialogue" name="mode" value="dialogue">
     <label for="mode-dialogue">
       <span class="icon">💬</span>
       対話シミュ
     </label>
   </div>
-  
+
   <div id="presenter-persona-input" style="display: none;">
     <label for="persona-text">ペルソナ設定（任意）</label>
     <textarea id="persona-text" rows="3" placeholder="例：この企画に投資するか判断する投資家"></textarea>
+  </div>
+
+  <div class="setting-section">
+    <label class="setting-label">フィードバック方法:</label>
+    <div class="feedback-mode-selection">
+      <input type="radio" id="fb-realtime" name="feedback_mode" value="realtime" checked>
+      <label for="fb-realtime">リアルタイム</label>
+
+      <input type="radio" id="fb-badge" name="feedback_mode" value="badge">
+      <label for="fb-badge">バッジで通知</label>
+
+      <input type="radio" id="fb-summary" name="feedback_mode" value="summary">
+      <label for="fb-summary">サマリーのみ</label>
+    </div>
   </div>
 
   <div class="action-buttons">
     <button id="startButton">練習を開始</button>
     <button id="stopButton">練習を終了</button>
   </div>
-  
+
   <script src="popup.js"></script>
 </body>
+
 </html>
