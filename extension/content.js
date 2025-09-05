@@ -1,63 +1,55 @@
-// content.js
-console.log("Prezento AI Coachのコンテントスクリプトが注入されました。");
+// content.js (リファクタリング版)
 
-// タイマー要素の作成
-let timerElement = null;
+let transcriptContainer = null;
 
+// background.jsからのメッセージを処理するリスナー
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('background.jsからメッセージを受信しました:', request);
-
-  // 経過時間の表示/更新
-  if (request.type === 'update_timer') {
-    if (!timerElement) {
-      // ページにタイマー要素がなければ作成する
-      timerElement = document.createElement('div');
-      timerElement.id = 'prezento-ai-coach-timer';
-      document.body.appendChild(timerElement);
-    }
-    timerElement.textContent = request.time;
+  switch (request.type) {
+    // ユーザーの文字起こしテキストを表示
+    case 'show-transcript':
+      updateTranscript(request.text, 'user');
+      break;
+    // AIのフィードバックテキストを表示 (既存機能との互換性のため残す)
+    case 'show-feedback':
+      updateTranscript(request.data, 'ai');
+      break;
+    // 録音停止時にUIを削除
+    case 'remove_ui_elements':
+      removeUI();
+      break;
   }
-
-  if (request.type === 'show-feedback') {
-    sendResponse({ status: 'フィードバックを表示しました。' });
-    showFeedbackBubble(request.data);
-  }
-
-  // 練習終了時にタイマーを削除
-  if (request.type === 'remove_ui_elements') {
-    if (timerElement) {
-      timerElement.remove();
-      timerElement = null;
-      console.log("タイマー要素を削除しました。");
-    }
-    // TODO: リアルタイムフィードバックの要素もここで削除する
-  }
-
-  return;
+  return true; // 非同期応答の可能性があることを示す
 });
 
-function showFeedbackBubble(text) {
-  // 既存のフキダシがあれば削除
-  const existingBubble = document.querySelector('.prezento-feedback-bubble');
-  if (existingBubble) {
-    existingBubble.remove();
+/**
+ * 画面上に文字起こしUIを作成または更新する
+ * @param {string} text 表示するテキスト
+ * @param {'user' | 'ai'} speaker 話者 (CSSクラスの割り当てに使用)
+ */
+function updateTranscript(text, speaker) {
+  // UIコンテナがまだなければ作成してページに追加
+  if (!transcriptContainer) {
+    transcriptContainer = document.createElement('div');
+    transcriptContainer.id = 'prezento-ai-transcript-container';
+    document.body.appendChild(transcriptContainer);
   }
 
-  // 新しいフキダシを作成
-  const bubble = document.createElement('div');
-  bubble.className = 'prezento-feedback-bubble';
-  bubble.textContent = text;
-  document.body.appendChild(bubble);
+  // 新しいメッセージ要素を作成
+  const messageEl = document.createElement('p');
+  messageEl.className = `prezento-ai-message ${speaker}`;
+  messageEl.textContent = text;
 
-  // 表示アニメーション
-  setTimeout(() => {
-    bubble.classList.add('show');
-  }, 10);
+  // コンテナに追加し、常に最新のメッセージが見えるように自動スクロール
+  transcriptContainer.appendChild(messageEl);
+  transcriptContainer.scrollTop = transcriptContainer.scrollHeight;
+}
 
-  // 5秒後に自動で消す
-  setTimeout(() => {
-    bubble.classList.remove('show');
-    // アニメーションが終わってから要素を削除
-    setTimeout(() => bubble.remove(), 500);
-  }, 5000);
+/**
+ * ページから文字起こしUIを削除する
+ */
+function removeUI() {
+  if (transcriptContainer) {
+    transcriptContainer.remove();
+    transcriptContainer = null;
+  }
 }

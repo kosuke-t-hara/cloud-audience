@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Live AI Coach</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      width: 350px;
+      height: 400px;
+      margin: 0;
+      padding: 10px;
+      background-color: #f9f9f9;
+    }
+    #header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    #avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background-color: #ddd;
+      margin-right: 10px;
+      /* TODO: AIアバター画像を設定 */
+    }
+    #ai-name {
+      font-weight: bold;
+    }
+    #transcript-container {
+      flex-grow: 1;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      padding: 10px;
+      overflow-y: auto;
+      background-color: #fff;
+      margin-bottom: 10px;
+    }
+    .message {
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+    .user-message {
+      text-align: right;
+      color: #333;
+    }
+    .ai-message {
+      text-align: left;
+      color: #0056b3;
+    }
+    #footer {
+      text-align: center;
+    }
+    #end-call-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 5px;
+      background-color: #dc3545;
+      color: white;
+      cursor: pointer;
+    }
+    #end-call-btn:hover {
+      background-color: #c82333;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <div id="avatar"></div>
+    <div id="ai-name">AI Coach</div>
+  </div>
+
+  <div id="transcript-container">
+    <!-- 対話ログはここに動的に追加される -->
+    <div class="message ai-message">こんにちは！プレゼンテーションについて、いくつか質問させてください。</div>
+  </div>
+
+  <div id="footer">
+    <button id="end-call-btn">対話を終了</button>
+  </div>
+
+  <script src="live_chat.js"></script>
+</body>
+</html>

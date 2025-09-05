@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "functions-framework --target=coachApi"
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +14,8 @@
     "@google-cloud/language": "^6.3.0",
     "@google-cloud/speech": "^6.4.0",
     "@google-cloud/vision": "^5.3.3",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "ws": "^8.18.3",
+    "@google/genai": "^0.14.0"
   }
 }

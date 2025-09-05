@@ -1,276 +1,177 @@
-// background.js
-const CLOUD_FUNCTION_URL = 'https://coachapi-hruygwmczq-an.a.run.app';
+// background.js (WebSocket対応版)
 console.log('background.jsが読み込まれました');
 
-let helperWindowId = null;
+// --- 定数 ---
+const WEBSOCKET_URL = 'ws://localhost:8080'; // ローカルのバックエンドサーバー
+
+// --- 状態管理 ---
 let isRecording = false;
-
-let fullTranscript = ""; // 全文を保存する変数
 let targetTabId = null;
+let socket = null;
 
-let currentMode = 'presenter'; //
-let currentPersona = null;
-let conversationHistory = []; // 会話履歴
+// --- Offscreen Document関連 ---
+async function hasOffscreenDocument(path) {
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [chrome.runtime.getURL(path)]
+  });
+  return existingContexts.length > 0;
+}
 
-let latestVideoFrame = null; // 最新のカメラ映像を保存する変数
-
-let sessionAnalysisResults = []; // 分析結果を蓄積する配列
-let currentFeedbackMode = 'realtime'; // フィードバックモード
-
-// 表示タイマー用
-let timerInterval = null;
-let elapsedTimeInSeconds = 0;
-
-// ショートカットキーのリスナー
-chrome.commands.onCommand.addListener((command) => {
-  if (command === "toggle_recording") {
-    // 1. ストレージからモードを読み込む
-    chrome.storage.local.get(['lastMode'], (result) => {
-      // 保存されたモードがなければ 'presenter' をデフォルトにする
-      const mode = result.lastMode || 'presenter';
-
-      chrome.storage.local.get(['lastPersona'], (result) => {
-        // 保存されたペルソナがなければ null をデフォルトにする
-        const persona = result.lastPersona || null;
-
-        chrome.storage.local.get(['lastFeedbackMode'], (result) => {
-          // 保存されたフィードバックモードがなければ 'realtime' をデフォルトにする
-          const feedbackMode = result.lastFeedbackMode || 'realtime';
-          isRecording ? stopRecording() : startRecording(mode, persona, feedbackMode);
-        });
-      });
-    });
-  }
-});
-
-function startRecording(mode, persona, feedbackMode) {
-  clearInterval(timerInterval); // 既存のタイマーをクリア
-
-  currentMode = mode;
-  currentPersona = persona; // ペルソナを保存
-  currentFeedbackMode = feedbackMode; // フィードバックモードを保存
-  isRecording = true;
-  fullTranscript = ""; // 練習開始時にリセット
-  conversationHistory = []; // 会話履歴をリセット
-  sessionAnalysisResults = []; // 分析結果をリセット
-  elapsedTimeInSeconds = 0; // タイマーリセット
-
-  // 1秒ごとにタイマー表示を更新
-  timerInterval = setInterval(() => {
-    elapsedTimeInSeconds++;
-    const minutes = Math.floor(elapsedTimeInSeconds / 60).toString().padStart(2, '0');
-    const seconds = (elapsedTimeInSeconds % 60).toString().padStart(2, '0');
-    const timeString = `${minutes}:${seconds}`;
-    
-    // content.jsに経過時間を送信
-    if (targetTabId) {
-      chrome.tabs.sendMessage(targetTabId, { type: 'update_timer', time: timeString });
-    }
-  }, 1000);
-
-  // 練習開始時にバッジをリセット
-  chrome.action.setBadgeText({ text: '' });
-
-  // 練習開始時に、これから操作するタブのIDを取得して保存する
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (!tabs[0]) {
-      console.error("操作対象のタブが見つかりません。");
-      return;
-    }
-    targetTabId = tabs[0].id; // IDを保存
-
-    // 練習開始時に、一度だけCSSとJSを注入する
-    chrome.scripting.insertCSS({
-      target: { tabId: targetTabId },
-      files: ["content.css"]
-    });
-    chrome.scripting.executeScript({
-      target: { tabId: targetTabId },
-      files: ["content.js"]
-    });
-
-    isRecording = true;
-    fullTranscript = "";
-    chrome.windows.create({
-      url: 'mic_helper.html', type: 'popup', width: 250, height: 150,
-    }, (win) => {
-      helperWindowId = win.id;
-      console.log("マイクヘルパーウィンドウが作成されました:", helperWindowId);
-    });
+async function setupOffscreenDocument(path) {
+  if (await hasOffscreenDocument(path)) return;
+  await chrome.offscreen.createDocument({
+    url: path,
+    reasons: ['USER_MEDIA'],
+    justification: 'マイク音声を取得してリアルタイムコーチングを行うため',
   });
 }
 
-function stopRecording() {
-  isRecording = false;
-  
-  clearInterval(timerInterval); // タイマーを停止
-  timerInterval = null;
-  // content.jsにUI要素の削除を依頼
-  if (targetTabId) {
-      chrome.tabs.sendMessage(targetTabId, { type: 'remove_ui_elements' });
-  }
+// --- WebSocket関連 ---
+function connectWebSocket() {
+  if (socket) return;
+  console.log(`WebSocketサーバー (${WEBSOCKET_URL}) に接続します...`);
+  socket = new WebSocket(WEBSOCKET_URL);
 
-  targetTabId = null; // 操作対象のタブIDをリセット
+  socket.onopen = (event) => {
+    console.log("WebSocket接続が確立しました。");
+    // TODO: 必要に応じて、接続時にペルソナ等の初期情報を送信
+  };
 
-  if (helperWindowId) {
-    chrome.runtime.sendMessage({ type: 'stop_recording' });
-    helperWindowId = null;
-  }
-  // 練習終了時にサマリー生成関数を呼び出す
-  generateSummary(sessionAnalysisResults);
+  socket.onmessage = (event) => {
+    // データが文字列かバイナリかを判定
+    if (typeof event.data === 'string') {
+      try {
+        const message = JSON.parse(event.data);
+        // 文字起こしデータの場合
+        if (message.type === 'transcript' && message.data) {
+          console.log("WebSocketから文字起こしデータを受信:", message.data);
+          // content.jsに文字起こしデータの表示を依頼
+          if (targetTabId) {
+            chrome.tabs.sendMessage(targetTabId, { type: 'show-transcript', text: message.data });
+          }
+        }
+      } catch (e) {
+        console.error("受信したJSONメッセージの解析に失敗:", e);
+      }
+    } else {
+      // バイナリデータは音声データとみなし、offscreen.jsに再生を依頼
+      console.log("WebSocketからAIの音声データを受信しました。");
+      chrome.runtime.sendMessage({
+        type: 'play-audio',
+        target: 'offscreen',
+        data: event.data 
+      });
+    }
+  };
+
+  socket.onclose = (event) => {
+    console.log("WebSocket接続が切れました:", event.code, event.reason);
+    socket = null;
+    if (isRecording) {
+      console.log("予期せず接続が切れたため、録音を停止します。");
+      stopRecording();
+    }
+  };
+
+  socket.onerror = (error) => {
+    console.error("WebSocketエラー:", error);
+    // エラー時も停止処理を呼ぶ
+    if (isRecording) {
+        stopRecording();
+    }
+  };
 }
 
-// ウィンドウが閉じられたことを検知
-chrome.windows.onRemoved.addListener((windowId) => {
-  if (windowId === helperWindowId) {
+// --- メインロジック ---
+async function startRecording(mode, persona, feedbackMode) {
+  if (isRecording) return;
+  isRecording = true;
+
+  // WebSocketに接続
+  connectWebSocket();
+
+  // UI注入
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tabs[0]) throw new Error("アクティブなタブが見つかりません。");
+    targetTabId = tabs[0].id;
+    await chrome.scripting.insertCSS({ target: { tabId: targetTabId }, files: ["content.css"] });
+    await chrome.scripting.executeScript({ target: { tabId: targetTabId }, files: ["content.js"] });
+  } catch (e) {
+    console.error("UIの注入に失敗しました:", e);
     isRecording = false;
-    helperWindowId = null;
+    return;
   }
-});
 
-// mic_helper.jsからのメッセージを受け取るリスナー
+  // Offscreen Documentをセットアップして録音開始を指示
+  await setupOffscreenDocument('offscreen.html');
+  chrome.runtime.sendMessage({ type: 'start-recording', target: 'offscreen' });
+
+  console.log("録音を開始しました。");
+}
+
+async function stopRecording() {
+  if (!isRecording) return;
+  isRecording = false;
+
+  // WebSocketを切断
+  if (socket) {
+    socket.close(1000, "Recording stopped by user.");
+    socket = null;
+  }
+
+  // UI要素の削除
+  if (targetTabId) {
+    chrome.tabs.sendMessage(targetTabId, { type: 'remove_ui_elements' });
+    targetTabId = null;
+  }
+
+  // Offscreen Documentを閉じる
+  if (await hasOffscreenDocument('offscreen.html')) {
+    chrome.runtime.sendMessage({ type: 'stop-recording', target: 'offscreen' });
+    setTimeout(() => chrome.offscreen.closeDocument(), 200);
+  }
+
+  console.log("録音を停止しました。");
+}
+
+// --- メッセージハンドリング ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'video_frame') {
-    console.log("カメラフレームを受信しました。");
-    latestVideoFrame = request.data;
-    // このメッセージは非同期応答が不要なため、ここで処理を終える
-    return; 
+  // offscreen.jsからのメッセージ
+  if (sender.url && sender.url.endsWith('offscreen.html')) {
+    switch (request.type) {
+      case 'audio_chunk':
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(request.data);
+        }
+        return;
+      case 'mic_error':
+        console.error("Offscreenでマイクエラー:", request.error);
+        stopRecording();
+        return;
+    }
   }
 
-  if (request.type === 'audio_chunk') {
-    handleAudioChunk(request.data);
-    return;
-  } 
-  
-  if (request.type === 'mic_error') {
-    console.error("ヘルパーウィンドウでエラー:", request.error);
-    console.error(request.error);
-    stopRecording();
-    return;
-  }
-
-  // ポップアップからの開始/停止リクエストを処理
+  // popup.jsからのメッセージ
   if (request.action === "start") {
-    console.log("練習を開始します。");
     startRecording(request.mode, request.persona, request.feedbackMode);
     sendResponse({ message: "練習を開始しました。" });
   } else if (request.action === "stop") {
     stopRecording();
     sendResponse({ message: "練習を停止しました。" });
   }
-  
-  return;
+  return true;
 });
 
-async function handleAudioChunk(audioContent) {
-  console.log("音声チャンクを処理中...");
-
-  try {
-    const screenshot = await captureVisibleTab();
-    const response = await fetch(CLOUD_FUNCTION_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'realtime-feedback',
-        mode: currentMode,
-        persona: currentPersona,
-        audioContent: audioContent,
-        imageContent: screenshot.split(',')[1],
-        videoFrameContent: latestVideoFrame, 
-        history: conversationHistory
-      })
+// ショートカットキーのリスナー
+chrome.commands.onCommand.addListener((command) => {
+  if (command === "toggle_recording") {
+    chrome.storage.local.get(['lastMode', 'lastPersona', 'lastFeedbackMode'], (result) => {
+      const mode = result.lastMode || 'presenter';
+      const persona = result.lastPersona || null;
+      const feedbackMode = result.lastFeedbackMode || 'realtime';
+      isRecording ? stopRecording() : startRecording(mode, persona, feedbackMode);
     });
-    const data = await response.json();
-
-    console.log("Cloud Functionからの応答データ:", data);
-
-    // ▼▼▼ 返ってきた分析結果を配列に保存 ▼▼▼
-    if (data.analysisData) {
-      sessionAnalysisResults.push(data.analysisData);
-    }
-
-    if (data.feedback) {
-      // ユーザーの発話とAIの応答を履歴に追加
-      conversationHistory.push({ role: 'user', parts: [{ text: data.transcript }] });
-      conversationHistory.push({ role: 'model', parts: [{ text: data.feedback }] });
-
-      fullTranscript += data.transcript + " ";
-
-      // ▼▼▼ フィードバックモードに応じて処理を分岐 ▼▼▼
-      switch (currentFeedbackMode) {
-        case 'realtime':
-          // リアルタイムフィードバックの場合の処理
-          // メッセージを送る直前に、アクティブなタブを取得する
-          if (targetTabId) {
-            // ステップ3: 注入完了後にメッセージを送信
-            chrome.tabs.sendMessage(targetTabId, { type: 'show-feedback', data: data.feedback });
-          } else {
-            console.error("フィードバック表示先のタブが見つかりません。");
-          }
-          break;
-        case 'badge':
-          // バッジ表示の場合の処理
-          chrome.action.setBadgeText({ text: '💡' }); // 例として電球アイコン
-          chrome.action.setBadgeBackgroundColor({ color: '#FBC02D' }); // 黄色など
-          // TODO: ポップアップにフィードバック履歴を保存するロジックを追加
-          break;
-        case 'summary':
-          // 何もしない
-          break;
-      }
-    }
-  } catch (error) {
-    console.error("handleAudioChunk内でエラーが発生しました:", error.message, error.stack);
   }
-}
-
-// 画面キャプチャを取得する関数
-function captureVisibleTab() {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.captureVisibleTab(null, { format: 'jpeg', quality: 80 }, (dataUrl) => {
-      if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
-      resolve(dataUrl);
-    });
-  });
-}
-
-// 5. ▼▼▼ サマリー生成用の関数を丸ごと追加 ▼▼▼
-async function generateSummary(analysisResults) {
-  if (analysisResults.length === 0) {
-    console.log("分析データがなかったため、サマリーを生成しませんでした。");
-    return;
-  }
-  console.log("サマリーを生成します。分析結果:", analysisResults);
-
-  try {
-    const response = await fetch(CLOUD_FUNCTION_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'summary-report',
-        analysisResults: analysisResults,
-        mode: currentMode,
-        persona: currentPersona,
-      })
-    });
-
-    try {
-      // テキストをJSONとして解析する
-      const summaryData = await response.json();
-
-      console.log("サマリー生成結果:", summaryData);
-      // 結果を新しいタブで開く
-      chrome.tabs.create({ url: 'summary.html' }, (tab) => {
-        // 新しいタブにデータを送る
-        setTimeout(() => {
-          chrome.tabs.sendMessage(tab.id, { type: 'show_summary', data: summaryData, mode: currentMode });
-        }, 500); // タブの読み込みを待つ
-      });
-    } catch(error) {
-      console.error("JSONの解析に失敗しました。整形後の文字列:", response, "エラー:", error);
-    }
-
-  } catch (error) {
-    console.error('サマリーの生成に失敗しました:', error);
-  }
-}
+});

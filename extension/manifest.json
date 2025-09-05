@@ -12,7 +12,8 @@
     "activeTab",
     "scripting",
     "debugger",
-    "storage"
+    "storage",
+    "offscreen"
   ],
   "action": {
     "default_icon": {

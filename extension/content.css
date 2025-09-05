@@ -34,3 +34,56 @@
   z-index: 99999;
   font-variant-numeric: tabular-nums; /* 数字の幅を等幅にする */
 }
+
+/* --- Transcript Container --- */
+#prezento-ai-transcript-container {
+  position: fixed;
+  bottom: 20px;
+  left: 20px; /* タイマー等と重ならないよう左側に配置 */
+  width: 350px;
+  height: 250px;
+  background-color: rgba(20, 20, 20, 0.8);
+  backdrop-filter: blur(5px); /* 背景をぼかす */
+  color: white;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+  z-index: 99998; /* タイマーよりは手前に */
+  overflow-y: auto;
+  font-family: sans-serif;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* メッセージ間のスペース */
+}
+
+/* スクロールバーの見た目を調整 */
+#prezento-ai-transcript-container::-webkit-scrollbar {
+  width: 5px;
+}
+#prezento-ai-transcript-container::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 10px;
+}
+#prezento-ai-transcript-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.prezento-ai-message {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 18px;
+  max-width: 85%;
+  line-height: 1.45;
+  word-wrap: break-word;
+}
+
+.prezento-ai-message.user {
+  background-color: #0078D4;
+  align-self: flex-end; /* 右寄せ */
+}
+
+.prezento-ai-message.ai {
+  background-color: #3A3A3A;
+  align-self: flex-start; /* 左寄せ */
+}
