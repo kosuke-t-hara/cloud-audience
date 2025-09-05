@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const modeRadios = document.querySelectorAll('input[name="mode"]');
   const presenterPersonaInput = document.getElementById('presenter-persona-input');
   const personaText = document.getElementById('persona-text');
-  const feedbackModeRadios = document.querySelectorAll('input[name="feedback_mode"]');
 
   // ▼▼▼ ラジオボタン変更時の表示制御を追加 ▼▼▼
   function togglePersonaInput() {
@@ -19,6 +18,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
   modeRadios.forEach(radio => {
     radio.addEventListener('change', togglePersonaInput);
+  });
+
+  // 起動時に、保存された言語設定を読み込んでUIに反映
+  chrome.storage.local.get(['lastLanguage'], (result) => {
+    if (result.lastLanguage) {
+      document.querySelector(`input[name="language"][value="${result.lastLanguage}"]`).checked = true;
+    }
   });
 
   // 起動時に、保存されたモードを読み込んでUIに反映
@@ -43,12 +49,19 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   startButton.addEventListener('click', () => {
+    // ▼▼▼ 選択された言語を取得 ▼▼▼
+    const selectedLanguage = document.querySelector('input[name="language"]:checked').value;
     // 選択されているモードを取得
     const selectedMode = document.querySelector('input[name="mode"]:checked').value;
     // プレゼンターモードの場合、ペルソナ設定を取得
     const persona = (selectedMode === 'presenter') ? personaText.value : null;
     // 選択されているフィードバックモードを取得
     const feedbackMode = document.querySelector('input[name="feedback_mode"]:checked').value;
+
+    // 選択されたモードをストレージに保存
+    chrome.storage.local.set({ lastLanguage: selectedLanguage }).then(() => {
+      console.log(`言語設定「${selectedLanguage}」を保存しました。`);
+    });
 
     // 選択されたモードをストレージに保存
     chrome.storage.local.set({ lastMode: selectedMode }).then(() => {
@@ -70,7 +83,8 @@ document.addEventListener('DOMContentLoaded', function() {
       action: "start",
       mode: selectedMode,
       persona: persona,
-      feedbackMode: feedbackMode
+      feedbackMode: feedbackMode,
+      language: selectedLanguage
     }, (response) => {
       console.log(response?.message);
     });

@@ -4,14 +4,22 @@ console.log('background.jsが読み込まれました');
 
 let helperWindowId = null;
 let isRecording = false;
+
 let fullTranscript = ""; // 全文を保存する変数
 let targetTabId = null;
+
 let currentMode = 'presenter'; //
 let currentPersona = null;
 let conversationHistory = []; // 会話履歴
+
 let latestVideoFrame = null; // 最新のカメラ映像を保存する変数
+
 let sessionAnalysisResults = []; // 分析結果を蓄積する配列
 let currentFeedbackMode = 'realtime'; // フィードバックモード
+
+// 表示タイマー用
+let timerInterval = null;
+let elapsedTimeInSeconds = 0;
 
 // ショートカットキーのリスナー
 chrome.commands.onCommand.addListener((command) => {
@@ -36,6 +44,8 @@ chrome.commands.onCommand.addListener((command) => {
 });
 
 function startRecording(mode, persona, feedbackMode) {
+  clearInterval(timerInterval); // 既存のタイマーをクリア
+
   currentMode = mode;
   currentPersona = persona; // ペルソナを保存
   currentFeedbackMode = feedbackMode; // フィードバックモードを保存
@@ -43,6 +53,20 @@ function startRecording(mode, persona, feedbackMode) {
   fullTranscript = ""; // 練習開始時にリセット
   conversationHistory = []; // 会話履歴をリセット
   sessionAnalysisResults = []; // 分析結果をリセット
+  elapsedTimeInSeconds = 0; // タイマーリセット
+
+  // 1秒ごとにタイマー表示を更新
+  timerInterval = setInterval(() => {
+    elapsedTimeInSeconds++;
+    const minutes = Math.floor(elapsedTimeInSeconds / 60).toString().padStart(2, '0');
+    const seconds = (elapsedTimeInSeconds % 60).toString().padStart(2, '0');
+    const timeString = `${minutes}:${seconds}`;
+    
+    // content.jsに経過時間を送信
+    if (targetTabId) {
+      chrome.tabs.sendMessage(targetTabId, { type: 'update_timer', time: timeString });
+    }
+  }, 1000);
 
   // 練習開始時にバッジをリセット
   chrome.action.setBadgeText({ text: '' });
@@ -78,7 +102,15 @@ function startRecording(mode, persona, feedbackMode) {
 
 function stopRecording() {
   isRecording = false;
-  targetTabId = null; 
+  
+  clearInterval(timerInterval); // タイマーを停止
+  timerInterval = null;
+  // content.jsにUI要素の削除を依頼
+  if (targetTabId) {
+      chrome.tabs.sendMessage(targetTabId, { type: 'remove_ui_elements' });
+  }
+
+  targetTabId = null; // 操作対象のタブIDをリセット
 
   if (helperWindowId) {
     chrome.runtime.sendMessage({ type: 'stop_recording' });

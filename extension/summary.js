@@ -67,5 +67,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   // 応答を返す
   sendResponse({ status: "OK" });
-  return true;
+  return;
 });
