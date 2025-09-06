@@ -28,6 +28,7 @@ async function startRecording() {
 
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    // APIの入力仕様(16kHz)に合わせる
     audioContext = new AudioContext({ sampleRate: 16000 });
     await audioContext.audioWorklet.addModule('audio-processor.js');
 
@@ -40,7 +41,7 @@ async function startRecording() {
       if (aiAudioSource) {
         aiAudioSource.stop();
         aiAudioSource = null;
-        console.log("Offscreen: ユーザーの発話を検知し、AI音声を停止（割り込み）");
+        console.log("Offscreen: ユーザーの発話を検知し、AI音声を停止(割り込み)");
       }
       chrome.runtime.sendMessage({ type: 'audio_chunk', data: event.data });
     };
@@ -110,7 +111,8 @@ async function playAudio(audioData) {
   }
 
   try {
-    const inputPcm = new Int16Array(audioData);
+    const inputPcm = new Int16Array(audioData);// AIの音声データ(24kHz PCM)
+
     // Geminiからの音声(24kHz)を、AudioContext(16kHz)に合わせてリサンプリング
     const resampledPcm = resamplePcm(inputPcm, 24000, 16000);
 

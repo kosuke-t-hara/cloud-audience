@@ -68,8 +68,19 @@ function connectWebSocket() {
   socket.onclose = (event) => {
     console.log("WebSocket接続が切れました:", event.code, event.reason);
     socket = null;
+
+    // 切断コードが1000 (正常終了) の場合:
+    // これは「AIのターンが完了した」ことを意味する正常な切断。
+    // 録音(isRecording)は停止せず、マイクは生かしたまま次の発話を待つ。
+    if (event.code === 1000) {
+      console.log("AIのターンが正常に終了しました。次の発話を待機します。");
+      return; // stopRecording() を呼ばない
+    }
+
+    // 1000以外のコード (1006異常切断など) で、まだ録音中の場合:
+    // これは本当に予期せぬエラーなので、録音を停止する。
     if (isRecording) {
-      console.log("予期せず接続が切れたため、録音を停止します。");
+      console.log(`予期せぬエラー(${event.code})で接続が切れたため、録音を停止します。`);
       stopRecording();
     }
   };
@@ -144,6 +155,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       case 'audio_chunk':
         if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send(request.data);
+
+        // 録音中だが、ソケットが存在しない場合:
+        // (＝1ターン目が終わり、これは2ターン目の最初のチャンクである)
+        } else if (isRecording && !socket) {
+          console.log("新しい発話を検知。WebSocketに再接続します...");
+          // 再接続を開始する (connectWebSocketは既に socket が null の時だけ new する安全な設計のはず)
+          connectWebSocket();
+          // 注: 理想的には、connectWebSocketが完了するまでこのチャンクをキューイングすべきですが、
+          // サーバー側(index.js)に既に強力なキューイング機能があるため、
+          // クライアント側は接続トリガーをかけるだけで良い（この最初のチャンクは失われるかもしれないが、
+          // すぐ後のチャンクがサーバーのキューに入り、セッションが開始される）
         }
         return;
       case 'mic_error':

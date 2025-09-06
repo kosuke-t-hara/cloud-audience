@@ -1,5 +1,9 @@
 // audio-processor.js
 
+// 音声として検出するための音量のしきい値 (0.0 ～ 1.0)
+// この値は調整が必要です。0.01 ～ 0.1 くらいから試してみてください。
+const VAD_THRESHOLD = 0.05; 
+
 class PcmProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -8,7 +12,6 @@ class PcmProcessor extends AudioWorkletProcessor {
   process(inputs, outputs, parameters) {
     // inputs[0][0] に Float32Array の音声データが含まれる
     const inputChannel = inputs[0][0];
-
     if (!inputChannel) {
       return true;
     }
