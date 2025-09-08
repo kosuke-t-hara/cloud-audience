@@ -1,134 +1,201 @@
-// offscreen.js (リファクタリング版)
+import { GoogleGenAI, Modality } from './lib/gemini-sdk.js';
 
-let audioContext;      // アプリケーションで唯一のAudioContext (16kHz)
-let mediaStream;       // マイクからの生ストリーム
-let workletNode;       // PCM変換を行うWorkletノード
-let aiAudioSource = null; // AIの音声を再生中のSourceNodeを保持
+// --- 定数 ---
+const GEMINI_API_KEY = 'AIzaSyBXYC5wZeheBszWRs6-kWn1jbqOqRLZyGY'; 
+const MODEL_NAME = 'gemini-2.5-flash-preview-native-audio-dialog';
 
-// background.jsからのメッセージを待つ
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.target !== 'offscreen') return;
+// --- Gemini関連の変数 ---
+let genAI;
+let session;
 
-  switch (msg.type) {
-    case 'start-recording':
-      startRecording();
-      break;
-    case 'stop-recording':
-      stopRecording();
-      break;
-    case 'play-audio':
-      playAudio(msg.data);
-      break;
-  }
-});
+// --- 音声処理関連の変数 ---
+let inputAudioContext;
+let outputAudioContext;
+let mediaStream;
+let scriptProcessorNode;
+let sourceNode;
+let nextStartTime = 0;
+const sources = new Set();
+let isRecording = false; // 録音状態を管理するフラグ
 
-async function startRecording() {
-  if (audioContext) return;
-  console.log("Offscreen: 録音開始処理");
-
+// --- 初期化処理 ---
+function initialize() {
+  console.log('Offscreen: 初期化処理を開始');
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-    // APIの入力仕様(16kHz)に合わせる
-    audioContext = new AudioContext({ sampleRate: 16000 });
-    await audioContext.audioWorklet.addModule('audio-processor.js');
+    genAI = new GoogleGenAI({ 
+      apiKey: GEMINI_API_KEY,
+      httpOptions: { apiVersion: 'v1alpha' } 
+    });
+    inputAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    outputAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+    console.log('Offscreen: オーディオコンテキストとGeminiクライアントの準備完了');
+  } catch (e) {
+    console.error('Offscreen: 初期化中にエラーが発生', e);
+  }
+}
 
-    const source = audioContext.createMediaStreamSource(mediaStream);
-    workletNode = new AudioWorkletNode(audioContext, 'pcm-processor');
-    source.connect(workletNode);
-    workletNode.connect(audioContext.destination);
+// --- メインの接続・セッション開始処理 ---
+async function startSession() {
+  if (session) {
+    console.log('Offscreen: 既存のセッションがあるため、一度閉じてから再接続します。');
+    session.close();
+    session = null;
+  }
+  console.log('Offscreen: Geminiとの新しいセッションを開始します...');
+  try {
+    session = await genAI.live.connect({
+      model: MODEL_NAME,
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
+        },
+      },
+      callbacks: {
+        onopen: () => {
+          console.log('Offscreen: Geminiとの接続が確立しました (onopen)');
+        },
+        onmessage: async (message) => {
+          handleGeminiMessage(message);
+        },
+        onerror: (error) => {
+          console.error('Offscreen: Geminiセッションでエラーが発生', error);
+        },
+        onclose: (event) => {
+          console.log('Offscreen: Geminiセッションが終了しました', event);
+          // サーバー側から切断された場合、録音状態を停止する
+          if (isRecording) {
+            stopRecording();
+          }
+        },
+      },
+    });
+    console.log('Offscreen: `live.connect` が完了しました。');
+    return true;
+  } catch (e) {
+    console.error('Offscreen: `live.connect` に失敗しました', e);
+    return false;
+  }
+}
 
-    workletNode.port.onmessage = (event) => {
-      if (aiAudioSource) {
-        aiAudioSource.stop();
-        aiAudioSource = null;
-        console.log("Offscreen: ユーザーの発話を検知し、AI音声を停止(割り込み)");
+// --- Geminiからのメッセージ処理 ---
+async function handleGeminiMessage(message) {
+  try {
+    const audio = message.serverContent?.modelTurn?.parts[0]?.inlineData;
+    if (audio) {
+      const audioBuffer = await outputAudioContext.decodeAudioData(base64ToArrayBuffer(audio.data));
+      const source = outputAudioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(outputAudioContext.destination);
+      source.addEventListener('ended', () => { sources.delete(source); });
+
+      const currentTime = outputAudioContext.currentTime;
+      nextStartTime = Math.max(nextStartTime, currentTime);
+      source.start(nextStartTime);
+      nextStartTime += audioBuffer.duration;
+      sources.add(source);
+    }
+
+    if (message.serverContent?.interrupted) {
+      console.log('Offscreen: AIの音声が割り込みにより停止されました。');
+      for (const source of sources.values()) {
+        source.stop();
+        sources.delete(source);
       }
-      chrome.runtime.sendMessage({ type: 'audio_chunk', data: event.data });
+      nextStartTime = 0;
+    }
+  } catch (e) {
+    console.error('Offscreen: Geminiからのメッセージ処理中にエラー', e);
+  }
+}
+
+// --- マイク録音の開始・停止 ---
+async function startRecording() {
+  if (isRecording) return;
+  console.log('Offscreen: 録音開始処理 (ScriptProcessorNode)...');
+  try {
+    await inputAudioContext.resume();
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    sourceNode = inputAudioContext.createMediaStreamSource(mediaStream);
+    
+    // 動作するサンプルに合わせてScriptProcessorNodeを使用
+    const bufferSize = 256;
+    scriptProcessorNode = inputAudioContext.createScriptProcessor(bufferSize, 1, 1);
+
+    scriptProcessorNode.onaudioprocess = (event) => {
+      if (!isRecording || !session) return;
+      const pcmData = event.inputBuffer.getChannelData(0);
+      try {
+        session.sendRealtimeInput({ media: { blob: new Blob([pcmData.buffer]) } });
+      } catch (e) {
+        // このエラーは接続が閉じているときに頻発する可能性があるため、isRecording中のみログに出す
+        if(isRecording) {
+          console.error('Offscreen: 音声データの送信に失敗', e);
+        }
+      }
     };
-    console.log("Offscreen: 音声処理パイプライン構築完了");
-  } catch (error) {
-    console.error("Offscreen: 録音開始エラー:", error);
-    chrome.runtime.sendMessage({ type: 'mic_error', error: { name: error.name, message: error.message } });
+
+    sourceNode.connect(scriptProcessorNode);
+    scriptProcessorNode.connect(inputAudioContext.destination);
+    isRecording = true;
+    console.log('Offscreen: マイクのセットアップ完了 (ScriptProcessorNode)。');
+  } catch (e) {
+    console.error('Offscreen: マイクのセットアップに失敗', e);
   }
 }
 
 function stopRecording() {
-  console.log("Offscreen: 録音停止処理");
-  if (aiAudioSource) {
-    aiAudioSource.stop();
-    aiAudioSource = null;
+  if (!isRecording) return;
+  console.log('Offscreen: 録音停止処理...');
+  isRecording = false; // ★最初にフラグを降ろす
+
+  if (scriptProcessorNode) {
+    scriptProcessorNode.disconnect();
+    scriptProcessorNode = null;
+  }
+  if (sourceNode) {
+    sourceNode.disconnect();
+    sourceNode = null;
   }
   if (mediaStream) {
     mediaStream.getTracks().forEach(track => track.stop());
     mediaStream = null;
   }
-  if (audioContext) {
-    audioContext.close();
-    audioContext = null;
+  if (session) {
+    session.close();
+    session = null;
   }
-  workletNode = null;
-  console.log("Offscreen: リソースを解放しました");
+  console.log('Offscreen: 全リソースを解放しました。');
 }
 
-/**
- * PCM音声データをリサンプリングする
- * @param {Int16Array} pcmData - 入力PCMデータ
- * @param {number} inputRate - 入力サンプルレート (例: 24000)
- * @param {number} outputRate - 出力サンプルレート (例: 16000)
- * @returns {Int16Array} リサンプリングされたPCMデータ
- */
-function resamplePcm(pcmData, inputRate, outputRate) {
-  if (inputRate === outputRate) return pcmData;
+// --- background.jsからのメッセージハンドラ ---
+chrome.runtime.onMessage.addListener(async (msg) => {
+  if (msg.target !== 'offscreen') return;
 
-  const ratio = inputRate / outputRate;
-  const newLength = Math.round(pcmData.length / ratio);
-  const result = new Int16Array(newLength);
-  let offsetResult = 0;
-  let offsetBuffer = 0;
-
-  while (offsetResult < result.length) {
-    const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
-    let accum = 0, count = 0;
-    for (let i = offsetBuffer; i < nextOffsetBuffer && i < pcmData.length; i++) {
-      accum += pcmData[i];
-      count++;
+  if (msg.type === 'start-recording') {
+    console.log('Offscreen: `start-recording`メッセージを受信');
+    const success = await startSession();
+    if (success) {
+      await startRecording();
     }
-    result[offsetResult] = Math.round(accum / count) || 0;
-    offsetResult++;
-    offsetBuffer = nextOffsetBuffer;
+  } else if (msg.type === 'stop-recording') {
+    console.log('Offscreen: `stop-recording`メッセージを受信');
+    stopRecording();
   }
-  return result;
+});
+
+// --- ヘルパー関数 ---
+function base64ToArrayBuffer(base64) {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
 }
 
-// AIの音声データ(ArrayBuffer)を再生する関数
-async function playAudio(audioData) {
-  if (!audioContext) {
-    console.error("AudioContextが初期化されていません。");
-    return;
-  }
-  if (aiAudioSource) {
-    aiAudioSource.stop();
-  }
-
-  try {
-    const inputPcm = new Int16Array(audioData);// AIの音声データ(24kHz PCM)
-
-    // Geminiからの音声(24kHz)を、AudioContext(16kHz)に合わせてリサンプリング
-    const resampledPcm = resamplePcm(inputPcm, 24000, 16000);
-
-    const audioBuffer = audioContext.createBuffer(1, resampledPcm.length, audioContext.sampleRate);
-    const channelData = audioBuffer.getChannelData(0);
-    for (let i = 0; i < resampledPcm.length; i++) {
-      channelData[i] = resampledPcm[i] / 32768.0; // Int16をFloat32に変換
-    }
-
-    aiAudioSource = audioContext.createBufferSource();
-    aiAudioSource.buffer = audioBuffer;
-    aiAudioSource.connect(audioContext.destination);
-    aiAudioSource.onended = () => { aiAudioSource = null; };
-    aiAudioSource.start();
-    console.log("Offscreen: AIの音声再生を開始しました。");
-  } catch (e) {
-    console.error("音声の再生に失敗しました:", e);
-  }
-}
+// --- 初期化実行 ---
+initialize();
+// 初期化完了をbackground.jsに通知
+chrome.runtime.sendMessage({ type: 'offscreen_ready' });

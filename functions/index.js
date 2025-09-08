@@ -35,13 +35,12 @@ wss.on('connection', (clientWs) => {
   const startGeminiSession = async () => {
     isSessionStarting = true; // 開始処理中
     try {
-      const model = 'models/gemini-live-2.5-flash-preview';
-      // const model = 'models/gemini-2.5-flash-live-preview';
+      const model = 'gemini-2.5-flash-preview-native-audio-dialog';
 
       liveSession = await ai.live.connect({
         model: model,
         config: {
-          responseModalities: [Modality.AUDIO],
+          responseModalities: [Modality.AUDIO, Modality.TEXT],
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
@@ -53,11 +52,14 @@ wss.on('connection', (clientWs) => {
         callbacks: {
           onopen: () => console.log('Geminiとのライブセッションが開始されました。'),
           onmessage: (message) => {
-            console.log('Geminiからメッセージを受信:', message);
+            console.log(' ★ Geminiからメッセージを受信:', message);
             if (message.audio) {
-              clientWs.send(message.audio);
+              console.log(' 音声メッセージを送信:');
+              const audioBase64 = Buffer.from(message.audio).toString('base64');
+              clientWs.send(JSON.stringify({ type: 'audio', data: audioBase64 }));
             }
             if (message.text) {
+              console.log(' 文字起こしメッセージを送信:');
               clientWs.send(JSON.stringify({ type: 'transcript', data: message.text }));
             }
           },
@@ -77,34 +79,32 @@ wss.on('connection', (clientWs) => {
       });
       console.log(`Geminiセッションをモデル ${model} で確立しました。`);
 
-      // AIに「役割」を与えるための指示テキストを送信する
-      // console.log('AIに役割(プロンプト)を送信します...');
-      // liveSession.sendClientContent({
-      //   turns: [{ 
-      //     text: "あなたは優秀な会話パートナーです。単にユーザーの発話に応答するだけでなく、あなたからも自由に話題を広げたり、関連する質問をしたりして、会話全体をリードしてください。" 
-      //   }]
-      // });
+      // ★ プロンプトと最初のチャンクを同時に送信 -> プロンプト送信を一旦やめる
+      const firstChunk = audioQueue.shift(); // キューから最初のチャンクを取り出す
+      if (!firstChunk) {
+        throw new Error("セッション開始時に音声キューが空です。");
+      }
 
-      console.log(`接続完了。キューイングされた ${audioQueue.length} 個のチャンクを送信します...`);
+      console.log('最初の音声チャンクを送信します...');
+      const firstChunkData = firstChunk.toString('base64');
+      liveSession.sendClientContent({
+        inlineData: {
+          mimeType: 'audio/pcm;rate=16000',
+          data: firstChunkData
+        }
+      });
 
-      // ★★★ スロットリング（速度調整）処理を追加 ★★★
-      // 1チャンクあたりの時間 (128サンプル / 16000 Hz * 1000ms ≈ 8ms)
-      // 負荷なども考慮し、少し余裕を持たせるか、キリの良い値（例: 10ms）にします。
-      const CHUNK_INTERVAL_MS = 10;
+      console.log(`接続完了。残りの ${audioQueue.length} 個のチャンクを送信します...`);
 
       for (const chunk of audioQueue) {
         if (liveSession) { // 途中で切断された場合に備える
-          // ★ データをBase64に変換し、MIMEタイプを指定したオブジェクトでラップする
           const data = chunk.toString('base64');
           liveSession.sendClientContent({
             inlineData: {
-              // ★★★ APIが期待する 16kHz を指定 ★★★
               mimeType: 'audio/pcm;rate=16000',
               data: data
             }
           });
-          // 各チャンクの間に、リアルタイム相当の待機時間（インターバル）を入れる
-          await new Promise(resolve => setTimeout(resolve, CHUNK_INTERVAL_MS));
         } else {
           console.warn('スロットリング処理中にセッションが切断されました。');
           break; // ループを抜ける
@@ -112,7 +112,7 @@ wss.on('connection', (clientWs) => {
       }
 
       console.log('キューの送信が完了しました。ライブストリーミングに移行します。');
-      audioQueue = []; 
+      audioQueue = [];
 
     } catch (error) {
       console.error('Geminiライブセッションの開始に失敗しました:', error);
@@ -125,25 +125,28 @@ wss.on('connection', (clientWs) => {
 
   // クライアントからのメッセージをGeminiに転送
   clientWs.on('message', async (message) => {
+    // ★ 空のメッセージは無視する
+    if (message.length === 0) {
+      console.log('空のメッセージを受信したため、無視します。');
+      return;
+    }
+
     try {
-      // 1. セッションがまだ確立されておらず、開始処理中でもない場合
-      //    (＝これが最初の音声メッセージ)
+      const MIN_CHUNKS_TO_START = 50; // セッション開始に必要なチャンク数
+
       if (!liveSession && !isSessionStarting) {
-        console.log('最初のオーディオチャンクを受信。キューに追加し、Geminiセッションを開始します...');
-        isSessionStarting = true;
         audioQueue.push(message);
-        // ★ ここで初めてGeminiセッションを開始する
-        startGeminiSession(); 
+        if (audioQueue.length >= MIN_CHUNKS_TO_START) {
+            console.log(`${audioQueue.length}個のオーディオチャンクを受信。キューに追加し、Geminiセッションを開始します...`);
+            startGeminiSession();
+        }
       } else if (isSessionStarting) {
-        // console.warn('Geminiセッション確立中。チャンクをキューに追加します。'); 
-        // (ログが多すぎる場合はコメントアウト)
-        audioQueue.push(message); // ★ 破棄せず、キューに追加する
+        audioQueue.push(message);
       } else if (liveSession && liveSession.sendClientContent) {
-        // ★ ライブ送信時も同様にBase64 + MIMEタイプでラップする
         const data = message.toString('base64');
         liveSession.sendClientContent({
           inlineData: {
-            mimeType: 'audio/pcm;rate=16000', // Linear16 PCM @ 16kHz
+            mimeType: 'audio/pcm;rate=16000',
             data: data
           }
         });
