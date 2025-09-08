@@ -322,23 +322,38 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
       `;
   }
 
+  const requestBody = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+    }
+  };
+
   try {
-    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Gemini API Error: ${response.status} ${response.statusText}`, errorText);
+      return { success: false, error: `API request failed with status ${response.status}` };
+    }
+
     const data = await response.json();
 
-    if (data.candidates && data.candidates.length > 0) {
+    if (data.candidates && data.candidates.length > 0 && data.candidates[0].content.parts.length > 0) {
       const jsonString = data.candidates[0].content.parts[0].text;
       console.log("Gemini Summary API応答:", jsonString);
 
-      const match = jsonString.match(/\{[\s\S]*\}/);
-      if (match) {
-        const geminiResult = JSON.parse(match[0]);
+      try {
+        const geminiResult = JSON.parse(jsonString);
 
         // ▼▼▼ ここから合計点を計算して追加 ▼▼▼
         let totalScore = 0;
-        // scoresオブジェクトが存在し、キーが1つ以上あることを確認
         if (geminiResult.scores && Object.keys(geminiResult.scores).length > 0) {
-          // Object.values()でスコアの数値だけを配列として取得し、reduceで合計
           totalScore = Object.values(geminiResult.scores).reduce((sum, score) => sum + score, 0);
         }
 
@@ -347,7 +362,7 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
           scores: geminiResult.scores,
           highlight: geminiResult.highlight,
           advice: geminiResult.advice,
-          analysis: { // analysisオブジェクトをここで追加
+          analysis: {
             speaking_rate: Math.round(combinedResults.speakingRate),
             long_pause_count: combinedResults.longPauseCount,
             filler_words_count: combinedResults.fillerWordCount
@@ -355,13 +370,20 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona) {
           totalScore: totalScore,
           persona_comment: geminiResult.persona_comment
         };
-        return finalSummary;
+        return { success: true, data: finalSummary };
+      } catch (parseError) {
+        console.error('Gemini Summary APIのJSONパースエラー:', parseError);
+        console.error('パースに失敗した文字列:', jsonString);
+        return { success: false, error: 'Failed to parse summary JSON.', details: parseError.message };
       }
+    } else {
+      console.error('Gemini Summary APIからの応答が不正です:', JSON.stringify(data, null, 2));
+      return { success: false, error: 'Invalid response structure from summary API.' };
     }
   } catch (error) {
-    console.error('Gemini Summary APIエラー:', error);
+    console.error('Gemini Summary APIの呼び出しエラー:', error);
+    return { success: false, error: 'Failed to call summary API.', details: error.message };
   }
-  return null;
 }
 
 functions.http('coachApi', async (req, res) => {
@@ -405,9 +427,13 @@ functions.http('coachApi', async (req, res) => {
       }
 
       const sentiment = await analyzeTextSentiment(combinedResults.fullTranscript);
-      const summary = await getGeminiSummary(combinedResults, sentiment, mode, persona);
+      const summaryResult = await getGeminiSummary(combinedResults, sentiment, mode, persona);
 
-      res.status(200).send(summary);
+      if (summaryResult.success) {
+        res.status(200).send(summaryResult.data);
+      } else {
+        res.status(500).send({ error: "サマリーの生成に失敗しました。", details: summaryResult.error, rawDetails: summaryResult.details });
+      }
     } else {
       res.status(400).send('Invalid request type');
     }

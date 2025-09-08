@@ -1,13 +1,21 @@
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  const loader = document.getElementById('loader');
+  const errorContainer = document.getElementById('error-container');
+  const summaryContent = document.getElementById('summary-content');
+
   if (request.type === 'show_summary') {
+    // ローディングを非表示にし、サマリーを表示
+    loader.style.display = 'none';
+    summaryContent.style.display = 'block';
+
     const mode = request.mode;
     const data = request.data;
 
     // モードに応じて表示を切り替える
     if (mode === 'presenter' || mode === 'creator') {
       // プレゼンター/クリエイターモードの処理
-      document.getElementById('totalScoreValue').textContent = data.totalScore;
       document.getElementById('rating-summary').style.display = 'block';
+      document.getElementById('totalScoreValue').textContent = data.totalScore;
       
       document.getElementById('highlight').textContent = data.highlight;
       document.getElementById('advice').textContent = data.advice;
@@ -41,7 +49,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             borderWidth: 2
           }]
         },
-        options: { scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 1 }}}}
+        options: { scales: { r: { beginAtZero: true, max: 100 }}}
       });
 
     } else if (mode === 'thinking') {
@@ -64,8 +72,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         newIdeasList.appendChild(li);
       });
     }
+  } else if (request.type === 'show_summary_error') {
+    // ローディングを非表示にし、エラーを表示
+    loader.style.display = 'none';
+    errorContainer.style.display = 'block';
+    
+    let errorMessage = `<h2>サマリーの生成に失敗しました</h2><p>${request.error}</p>`;
+    if (request.details) {
+      errorMessage += `<p>詳細: ${request.details}</p>`;
+    }
+    errorContainer.innerHTML = errorMessage;
   }
+
   // 応答を返す
   sendResponse({ status: "OK" });
-  return;
+  return true; // 非同期処理を示すためにtrueを返す
 });

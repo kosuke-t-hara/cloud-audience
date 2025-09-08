@@ -100,8 +100,9 @@ function startRecording(mode, persona, feedbackMode) {
   });
 }
 
-function stopRecording() {
+function stopRecording(sendResponseCallback) { // デフォルト値を設定
   isRecording = false;
+  stopRequestSendResponse = sendResponseCallback; // sendResponseを保存
   
   clearInterval(timerInterval); // タイマーを停止
   timerInterval = null;
@@ -127,6 +128,8 @@ chrome.windows.onRemoved.addListener((windowId) => {
     helperWindowId = null;
   }
 });
+
+let stopRequestSendResponse = null; // sendResponseを保持する変数
 
 // mic_helper.jsからのメッセージを受け取るリスナー
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -155,11 +158,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     startRecording(request.mode, request.persona, request.feedbackMode);
     sendResponse({ message: "練習を開始しました。" });
   } else if (request.action === "stop") {
-    stopRecording();
-    sendResponse({ message: "練習を停止しました。" });
+    stopRecording(sendResponse); // sendResponseを渡す
+    return true; // 非同期のsendResponseを使うためにtrueを返す
   }
   
-  return;
+  return false; // その他のメッセージタイプでは非同期応答は不要
 });
 
 async function handleAudioChunk(audioContent) {
@@ -234,10 +237,16 @@ function captureVisibleTab() {
   });
 }
 
-// 5. ▼▼▼ サマリー生成用の関数を丸ごと追加 ▼▼▼
 async function generateSummary(analysisResults) {
+  // ★変更点: 先にサマリータブを開く
+  const summaryTab = await chrome.tabs.create({ url: 'summary.html' });
+
   if (analysisResults.length === 0) {
     console.log("分析データがなかったため、サマリーを生成しませんでした。");
+    // ★変更点: エラーメッセージをサマリータブに表示
+    setTimeout(() => {
+        chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary_error', error: '分析データがありませんでした。' });
+    }, 500);
     return;
   }
   console.log("サマリーを生成します。分析結果:", analysisResults);
@@ -254,23 +263,31 @@ async function generateSummary(analysisResults) {
       })
     });
 
-    try {
-      // テキストをJSONとして解析する
-      const summaryData = await response.json();
-
-      console.log("サマリー生成結果:", summaryData);
-      // 結果を新しいタブで開く
-      chrome.tabs.create({ url: 'summary.html' }, (tab) => {
-        // 新しいタブにデータを送る
-        setTimeout(() => {
-          chrome.tabs.sendMessage(tab.id, { type: 'show_summary', data: summaryData, mode: currentMode });
-        }, 500); // タブの読み込みを待つ
-      });
-    } catch(error) {
-      console.error("JSONの解析に失敗しました。整形後の文字列:", response, "エラー:", error);
+    // ★変更点: response.ok でステータスコードをチェック
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "サーバーから不明なエラー応答", details: response.statusText }));
+        console.error("サマリー生成APIエラー:", errorData);
+        chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary_error', error: errorData.error, details: errorData.details });
+        return; // ここで処理を終了
     }
+
+    const summaryData = await response.json();
+
+    console.log("サマリー生成結果:", summaryData);
+    // ★変更点: setTimeoutの時間を調整し、tab.id を summaryTab.id に変更
+    setTimeout(() => {
+      chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary', data: summaryData, mode: currentMode });
+    }, 100);
 
   } catch (error) {
     console.error('サマリーの生成に失敗しました:', error);
+    // ★変更点: エラーをサマリータブに表示
+    chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary_error', error: 'サマリーの生成に失敗しました。', details: error.message });
+  } finally {
+    // ★変更点: popup.jsに応答を返す
+    if (stopRequestSendResponse) {
+      stopRequestSendResponse({ message: "処理が完了しました。" });
+      stopRequestSendResponse = null; // 使い終わったらクリア
+    }
   }
 }

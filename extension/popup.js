@@ -91,8 +91,16 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   stopButton.addEventListener('click', () => {
+    // ボタンを無効化し、テキストを変更
+    stopButton.disabled = true;
+    stopButton.textContent = '生成中...';
+
     chrome.runtime.sendMessage({ action: "stop" }, (response) => {
       console.log(response?.message);
+      // backgroundからの応答があればポップアップを閉じる
+      if (response) {
+        window.close();
+      }
     });
   });
   // 初期表示の更新
