@@ -68,8 +68,9 @@ function startRecording(mode, persona, feedbackMode) {
     }
   }, 1000);
 
-  // 練習開始時にバッジをリセット
-  chrome.action.setBadgeText({ text: '' });
+  // 練習開始時にバッジをRECに変更
+  chrome.action.setBadgeText({ text: 'REC' });
+  chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
 
   // 練習開始時に、これから操作するタブのIDを取得して保存する
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -100,9 +101,13 @@ function startRecording(mode, persona, feedbackMode) {
   });
 }
 
-function stopRecording(sendResponseCallback) { // デフォルト値を設定
+function stopRecording(sendResponseCallback) {
   isRecording = false;
-  stopRequestSendResponse = sendResponseCallback; // sendResponseを保存
+  stopRequestSendResponse = sendResponseCallback;
+
+  // ローディング表示を開始
+  chrome.action.setBadgeText({ text: '...' });
+  chrome.action.setBadgeBackgroundColor({ color: '#FFA500' }); // オレンジ色
   
   clearInterval(timerInterval); // タイマーを停止
   timerInterval = null;
@@ -117,6 +122,7 @@ function stopRecording(sendResponseCallback) { // デフォルト値を設定
     chrome.runtime.sendMessage({ type: 'stop_recording' });
     helperWindowId = null;
   }
+
   // 練習終了時にサマリー生成関数を呼び出す
   generateSummary(sessionAnalysisResults);
 }
@@ -241,39 +247,39 @@ async function generateSummary(analysisResults) {
   // ★変更点: 先にサマリータブを開く
   const summaryTab = await chrome.tabs.create({ url: 'summary.html' });
 
-  if (analysisResults.length === 0) {
-    console.log("分析データがなかったため、サマリーを生成しませんでした。");
+    if (analysisResults.length === 0) {
+      console.log("分析データがなかったため、サマリーを生成しませんでした。");
     // ★変更点: エラーメッセージをサマリータブに表示
     setTimeout(() => {
         chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary_error', error: '分析データがありませんでした。' });
     }, 500);
     return;
   }
-  console.log("サマリーを生成します。分析結果:", analysisResults);
+      console.log("サマリーを生成します。分析結果:", analysisResults);
 
   try {
-    const response = await fetch(CLOUD_FUNCTION_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'summary-report',
-        analysisResults: analysisResults,
-        mode: currentMode,
-        persona: currentPersona,
-      })
-    });
+      const response = await fetch(CLOUD_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'summary-report',
+          analysisResults: analysisResults,
+          mode: currentMode,
+          persona: currentPersona,
+        })
+      });
 
     // ★変更点: response.ok でステータスコードをチェック
-    if (!response.ok) {
+      if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "サーバーから不明なエラー応答", details: response.statusText }));
         console.error("サマリー生成APIエラー:", errorData);
         chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary_error', error: errorData.error, details: errorData.details });
         return; // ここで処理を終了
     }
 
-    const summaryData = await response.json();
+        const summaryData = await response.json();
 
-    console.log("サマリー生成結果:", summaryData);
+        console.log("サマリー生成結果:", summaryData);
     // ★変更点: setTimeoutの時間を調整し、tab.id を summaryTab.id に変更
     setTimeout(() => {
       chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary', data: summaryData, mode: currentMode });
