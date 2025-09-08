@@ -25,7 +25,7 @@
     const recorder = new MediaRecorder(audioOnlyStream, { mimeType: 'audio/webm' });
 
     // 録音の最大時間を設定
-    const MAX_RECORDING_DURATION = 55000; // 55秒に設定 (API制限の60秒より短く)
+    const MAX_RECORDING_DURATION = 45000; // 45秒に設定 (API制限の60秒より短く)
     let recordingTimer; // タイマーを保持する変数
 
     recorder.onstart = () => {
