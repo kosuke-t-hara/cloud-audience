@@ -48,6 +48,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  // 起動時に、保存された表情分析設定を読み込んでUIに反映
+  chrome.storage.local.get(['lastFaceAnalysis'], (result) => {
+    if (result.lastFaceAnalysis) {
+      document.querySelector(`input[name="face_analysis"][value="${result.lastFaceAnalysis}"]`).checked = true;
+    }
+  });
+
   startButton.addEventListener('click', () => {
     // ▼▼▼ 選択された言語を取得 ▼▼▼
     const selectedLanguage = document.querySelector('input[name="language"]:checked').value;
@@ -57,6 +64,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const persona = (selectedMode === 'presenter') ? personaText.value : null;
     // 選択されているフィードバックモードを取得
     const feedbackMode = document.querySelector('input[name="feedback_mode"]:checked').value;
+    // 選択されている表情分析設定を取得
+    const faceAnalysis = document.querySelector('input[name="face_analysis"]:checked').value;
 
     // 選択されたモードをストレージに保存
     chrome.storage.local.set({ lastLanguage: selectedLanguage }).then(() => {
@@ -78,13 +87,19 @@ document.addEventListener('DOMContentLoaded', function() {
       console.log(`フィードバックモード「${feedbackMode}」を保存しました。`);
     });
 
+    // 選択された表情分析設定をストレージに保存
+    chrome.storage.local.set({ lastFaceAnalysis: faceAnalysis }).then(() => {
+      console.log(`表情分析設定「${faceAnalysis}」を保存しました。`);
+    });
+
     // background.jsへ、モード情報も一緒に送信する
     chrome.runtime.sendMessage({
       action: "start",
       mode: selectedMode,
       persona: persona,
       feedbackMode: feedbackMode,
-      language: selectedLanguage
+      language: selectedLanguage,
+      faceAnalysis: faceAnalysis
     }, (response) => {
       console.log(response?.message);
     });

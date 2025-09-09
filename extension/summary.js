@@ -86,5 +86,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // 応答を返す
   sendResponse({ status: "OK" });
+
+  // background.jsにサマリー表示完了を通知
+  chrome.runtime.sendMessage({ type: 'SUMMARY_DISPLAY_COMPLETE' });
+
   return true; // 非同期処理を示すためにtrueを返す
 });

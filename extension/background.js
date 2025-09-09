@@ -13,6 +13,7 @@ let currentPersona = null;
 let conversationHistory = []; // 会話履歴
 
 let latestVideoFrame = null; // 最新のカメラ映像を保存する変数
+let isFaceAnalysisEnabled = true; // 表情分析が有効かどうかのフラグ
 
 let sessionAnalysisResults = []; // 分析結果を蓄積する配列
 let currentFeedbackMode = 'realtime'; // フィードバックモード
@@ -25,30 +26,23 @@ let elapsedTimeInSeconds = 0;
 chrome.commands.onCommand.addListener((command) => {
   if (command === "toggle_recording") {
     // 1. ストレージからモードを読み込む
-    chrome.storage.local.get(['lastMode'], (result) => {
-      // 保存されたモードがなければ 'presenter' をデフォルトにする
+    chrome.storage.local.get(['lastMode', 'lastPersona', 'lastFeedbackMode', 'lastFaceAnalysis'], (result) => {
       const mode = result.lastMode || 'presenter';
-
-      chrome.storage.local.get(['lastPersona'], (result) => {
-        // 保存されたペルソナがなければ null をデフォルトにする
-        const persona = result.lastPersona || null;
-
-        chrome.storage.local.get(['lastFeedbackMode'], (result) => {
-          // 保存されたフィードバックモードがなければ 'realtime' をデフォルトにする
-          const feedbackMode = result.lastFeedbackMode || 'realtime';
-          isRecording ? stopRecording() : startRecording(mode, persona, feedbackMode);
-        });
-      });
+      const persona = result.lastPersona || null;
+      const feedbackMode = result.lastFeedbackMode || 'realtime';
+      const faceAnalysis = result.lastFaceAnalysis || 'on';
+      isRecording ? stopRecording() : startRecording(mode, persona, feedbackMode, faceAnalysis);
     });
   }
 });
 
-function startRecording(mode, persona, feedbackMode) {
+function startRecording(mode, persona, feedbackMode, faceAnalysis) {
   clearInterval(timerInterval); // 既存のタイマーをクリア
 
   currentMode = mode;
   currentPersona = persona; // ペルソナを保存
   currentFeedbackMode = feedbackMode; // フィードバックモードを保存
+  isFaceAnalysisEnabled = (faceAnalysis === 'on'); // 表情分析の有効/無効を設定
   isRecording = true;
   fullTranscript = ""; // 練習開始時にリセット
   conversationHistory = []; // 会話履歴をリセット
@@ -161,11 +155,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // ポップアップからの開始/停止リクエストを処理
   if (request.action === "start") {
     console.log("練習を開始します。");
-    startRecording(request.mode, request.persona, request.feedbackMode);
+    startRecording(request.mode, request.persona, request.feedbackMode, request.faceAnalysis);
     sendResponse({ message: "練習を開始しました。" });
   } else if (request.action === "stop") {
     stopRecording(sendResponse); // sendResponseを渡す
     return true; // 非同期のsendResponseを使うためにtrueを返す
+  } else if (request.type === 'SUMMARY_DISPLAY_COMPLETE') {
+    // サマリー表示完了の通知を受けたらバッジを消す
+    chrome.action.setBadgeText({ text: '' });
   }
   
   return false; // その他のメッセージタイプでは非同期応答は不要
@@ -176,18 +173,24 @@ async function handleAudioChunk(audioContent) {
 
   try {
     const screenshot = await captureVisibleTab();
+    
+    const requestBody = {
+      type: 'realtime-feedback',
+      mode: currentMode,
+      persona: currentPersona,
+      audioContent: audioContent,
+      imageContent: screenshot.split(',')[1],
+      history: conversationHistory
+    };
+
+    if (isFaceAnalysisEnabled) {
+      requestBody.videoFrameContent = latestVideoFrame;
+    }
+
     const response = await fetch(CLOUD_FUNCTION_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'realtime-feedback',
-        mode: currentMode,
-        persona: currentPersona,
-        audioContent: audioContent,
-        imageContent: screenshot.split(',')[1],
-        videoFrameContent: latestVideoFrame, 
-        history: conversationHistory
-      })
+      body: JSON.stringify(requestBody)
     });
     const data = await response.json();
 
