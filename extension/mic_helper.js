@@ -13,7 +13,12 @@
   let audioContext = null;
 
   try {
-    const constraints = { audio: true };
+    // [修正点1] サーバーの仕様に合わせてサンプリングレートを48000に指定
+    const constraints = {
+      audio: {
+        sampleRate: 48000
+      }
+    };
     if (isFaceAnalysisEnabled) {
       constraints.video = true;
     }
@@ -27,8 +32,17 @@
     }
     const audioStream = new MediaStream(audioTracks);
 
-    recorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
-    const MAX_RECORDING_DURATION = 45000;
+    // [修正点2] サーバーの仕様に合わせてエンコーディングを'audio/webm;codecs=opus'に指定
+    const mimeType = 'audio/webm;codecs=opus';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      console.error(`${mimeType} はサポートされていません。`);
+      alert(`${mimeType} はお使いのブラウザではサポートされていません。`);
+      return;
+    }
+    recorder = new MediaRecorder(audioStream, { mimeType: mimeType });
+
+    // [復元点1] 最大録音時間とタイマー
+    const MAX_RECORDING_DURATION = 45000; // 45秒
     let recordingTimer;
 
     recorder.onstart = () => {
@@ -41,7 +55,8 @@
       }, MAX_RECORDING_DURATION);
     };
 
-    audioContext = new AudioContext();
+    // [復元点2] 無音検知ロジック (AnalyserNode)
+    audioContext = new AudioContext({ sampleRate: 48000 });
     const source = audioContext.createMediaStreamSource(audioStream);
     const analyser = audioContext.createAnalyser();
     analyser.fftSize = 256;
@@ -50,12 +65,12 @@
     source.connect(analyser);
 
     let silenceStart = performance.now();
-    const SILENCE_THRESHOLD = 5000;
-    const PAUSE_DURATION = 3000;
+    const SILENCE_THRESHOLD = 5000; // この値は環境に応じて調整が必要な場合があります
+    const PAUSE_DURATION = 3000;    // 3秒の無音で区切る
 
     function detectSilence() {
-      if (recorder.state !== 'recording') {
-        requestAnimationFrame(detectSilence);
+      // 録音が停止しているか、ストリームが非アクティブならループを止める
+      if (recorder.state !== 'recording' || !stream.active) {
         return;
       }
       analyser.getByteFrequencyData(dataArray);
@@ -65,7 +80,7 @@
           if (recorder.state === 'recording') {
             console.log("「間」を検知しました。音声を区切ります。");
             recorder.stop();
-            silenceStart = performance.now();
+            silenceStart = performance.now(); // 時間をリセット
           }
         }
       } else {
@@ -85,11 +100,23 @@
       }
     };
 
+    // [復元点3] 録音の自動再開ロジック
     recorder.onstop = () => {
       clearTimeout(recordingTimer);
-      if (stream.active) { // 元のストリームがアクティブか確認
+      if (stream.active) { // ストリームがアクティブな場合のみ録音を再開
         recorder.start();
       }
+    };
+
+    recorder.onerror = (event) => {
+      console.error("MediaRecorderでエラーが発生しました:", event.error);
+      chrome.runtime.sendMessage({
+        type: 'mic_error',
+        error: {
+          name: event.error.name,
+          message: event.error.message
+        }
+      });
     };
 
     // --- 2. 表情分析が有効な場合のみ、映像処理のセットアップを行う ---
@@ -137,11 +164,12 @@
       if (frameCaptureInterval) {
         clearInterval(frameCaptureInterval);
       }
-      if (recorder && recorder.state === 'recording') {
-        recorder.stop();
-      }
+      // ストリームを停止すると.activeがfalseになり、onstopでの自動再開が止まる
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
+      }
+      if (recorder && recorder.state === 'recording') {
+        recorder.stop();
       }
       if (audioContext) {
         audioContext.close();

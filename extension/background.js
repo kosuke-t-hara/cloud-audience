@@ -18,6 +18,7 @@ let isFaceAnalysisEnabled = true; // 表情分析が有効かどうかのフラ�
 
 let sessionAnalysisResults = []; // 分析結果を蓄積する配列
 let currentFeedbackMode = 'realtime'; // フィードバックモード
+let consecutiveFailures = 0; // ★ 音声認識の連続失敗回数をカウント
 
 // 表示タイマー用
 let timerInterval = null;
@@ -49,6 +50,7 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis) {
   conversationSummary = ""; // ★ 練習開始時に要約をリセット
   sessionAnalysisResults = [];
   elapsedTimeInSeconds = 0;
+  consecutiveFailures = 0; // ★ カウンターをリセット
 
   timerInterval = setInterval(() => {
     elapsedTimeInSeconds++;
@@ -180,6 +182,26 @@ async function handleAudioChunk(audioContent) {
 
     console.log("Cloud Functionからの応答データ:", data);
 
+    // ★ 音声認識の失敗を監視
+    const MAX_CONSECUTIVE_FAILURES = 3;
+    if (!data.transcript || data.transcript.trim() === "") {
+      consecutiveFailures++;
+      console.log(`音声認識失敗が連続 ${consecutiveFailures} 回目です。`);
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        console.log("音声認識の連続失敗が上限に達したため、録音を停止します。");
+        stopRecording();
+        if (targetTabId) {
+          chrome.tabs.sendMessage(targetTabId, {
+            type: 'show_error',
+            data: '音声が認識できませんでした。マイクの設定を確認し、再度お試しください。'
+          });
+        }
+        return;
+      }
+    } else {
+      consecutiveFailures = 0; // 成功したらリセット
+    }
+
     // ★ 新しい要約を受け取り、更新する
     if (data.newConversationSummary) {
       conversationSummary = data.newConversationSummary;
@@ -262,7 +284,7 @@ async function generateSummary(analysisResults, finalConversationSummary) {
     console.log("サマリー生成結果:", summaryData);
     setTimeout(() => {
       chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary', data: summaryData, mode: currentMode });
-    }, 100);
+    }, 500);
 
   } catch (error) {
     console.error('サマリーの生成に失敗しました:', error);

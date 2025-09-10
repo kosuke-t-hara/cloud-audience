@@ -34,3 +34,10 @@
   z-index: 99999;
   font-variant-numeric: tabular-nums; /* 数字の幅を等幅にする */
 }
+
+/* エラーメッセージ用のスタイル */
+.prezento-feedback-bubble.error {
+  background-color: #FFCDD2; /* 薄い赤 */
+  color: #D32F2F;      /* 濃い赤 */
+  border: 1px solid #D32F2F;
+}

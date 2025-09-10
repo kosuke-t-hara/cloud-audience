@@ -87,6 +87,9 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
   if (request.type === 'show-feedback') {
     sendResponse({ status: 'フィードバックを表示しました。' });
     showFeedbackBubble(request.data);
+  } else if (request.type === 'show_error') { // ★ エラー表示の分岐を追加
+    sendResponse({ status: 'エラーを表示しました。' });
+    showFeedbackBubble(request.data, 'error');
   }
 
   // 練習終了時にタイマーを削除
@@ -102,7 +105,7 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
   return;
 });
 
-function showFeedbackBubble(text) {
+function showFeedbackBubble(text, style = 'normal') {
   // 既存のフキダシがあれば削除
   const existingBubble = document.querySelector('.prezento-feedback-bubble');
   if (existingBubble) {
@@ -112,6 +115,9 @@ function showFeedbackBubble(text) {
   // 新しいフキダシを作成
   const bubble = document.createElement('div');
   bubble.className = 'prezento-feedback-bubble';
+  if (style === 'error') { // ★ エラー用のクラスを追加
+    bubble.classList.add('error');
+  }
   bubble.textContent = text;
   document.body.appendChild(bubble);
 
