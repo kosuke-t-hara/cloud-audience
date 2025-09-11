@@ -180,6 +180,7 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
         - highlight: 最も良かった点を含めて800字以内で記述
         - advice: 改善点を800字以内で記述
         - 最後に、あなたは「${creatorPersonaPromptPart}」の役割に完全になりきり、発話全体への総評を persona_comment として800字以内で記述してください。
+        - さらに、この動画の視聴者として、内容を深掘りするための鋭い質問を3つ生成し、'questions'キーに配列として含めてください。
         - 必ず「出力形式」のJSON形式にのみ従ってください。
 
         # 分析データ
@@ -210,7 +211,12 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
           },
           "highlight": "<string>",
           "advice": "<string>",
-          "persona_comment": "<string>" 
+          "persona_comment": "<string>",
+          "questions": [
+            "<string: 質問1>",
+            "<string: 質問2>",
+            "<string: 質問3>"
+          ]
         }
 
         # 文字起こしデータ
@@ -231,6 +237,7 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
         - key_points: キーポイントを3つ、箇条書きの配列で
         - new_ideas: そこから発展する可能性のある新しいアイデアを3つ、箇条書きの配列で
         - summary_text: セッション全体の要約を、美しい比喩を用いながら800字以内で記述
+        - さらに、思考を深めるための鋭い問いを3つ生成し、'questions'キーに配列として含めてください。
 
         # リアルタイム対話の要約
         ${conversationSummary || 'リアルタイムの対話はありませんでした。'}
@@ -239,7 +246,12 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
         {
           "key_points": ["<string>"],
           "new_ideas": ["<string>"],
-          "summary_text": "<string>"
+          "summary_text": "<string>",
+          "questions": [
+            "<string: 質問1>",
+            "<string: 質問2>",
+            "<string: 質問3>"
+          ]
         }
       
         # 文字起こしデータ
@@ -262,6 +274,7 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
         - highlight: 最も良かった点を含めて800字以内で記述
         - advice: 改善点を800字以内で記述
         - 最後に、あなたは「${personaPromptPart}」という設定に完全になりきり、発話全体への総評を persona_comment として800字以内で記述してください。
+        - さらに、このプレゼンテーションのペルソナあるいは聴衆として、内容を深掘りするための鋭い質問を3つ生成し、'questions'キーに配列として含めてください。
         - 必ず「出力形式」のJSON形式にのみ従ってください。
 
         # 分析データ
@@ -292,7 +305,12 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
           },
           "highlight": "<string>",
           "advice": "<string>",
-          "persona_comment": "<string>" 
+          "persona_comment": "<string>",
+          "questions": [
+            "<string: 質問1>",
+            "<string: 質問2>",
+            "<string: 質問3>"
+          ]
         }
 
         # 文字起こしデータ
@@ -344,7 +362,8 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
             filler_words_count: combinedResults.fillerWordCount
           },
           totalScore: totalScore,
-          persona_comment: geminiResult.persona_comment
+          persona_comment: geminiResult.persona_comment,
+          questions: geminiResult.questions // ★ 追加
         };
         return { success: true, data: finalSummary };
       } catch (parseError) {

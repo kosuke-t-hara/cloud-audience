@@ -64,6 +64,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         options: { scales: { r: { beginAtZero: true, max: 100 }}}
       });
 
+      // AIからの質問リストを描画
+      if (data.questions && data.questions.length > 0) {
+        const questionsList = document.getElementById('questions-list-rating');
+        data.questions.forEach(question => {
+          const li = document.createElement('li');
+          li.textContent = question;
+          questionsList.appendChild(li);
+        });
+      }
+
     } else if (mode === 'thinking') {
       // 思考パートナーモードの処理
       document.getElementById('thinking-summary').style.display = 'block';
@@ -83,6 +93,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         li.textContent = idea;
         newIdeasList.appendChild(li);
       });
+
+      // AIからの質問リストを描画
+      if (data.questions && data.questions.length > 0) {
+        const questionsList = document.getElementById('questions-list-thinking');
+        data.questions.forEach(question => {
+          const li = document.createElement('li');
+          li.textContent = question;
+          questionsList.appendChild(li);
+        });
+      }
     }
 
     // ★★★ 変更点: アコーディオンロジックを追加 ★★★
