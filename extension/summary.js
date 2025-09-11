@@ -11,6 +11,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const mode = request.mode;
     const data = request.data;
 
+    // ★★★ 追加: 練習時間を表示 ★★★
+    if (data.totalTime) {
+      const minutes = Math.floor(data.totalTime / 60).toString().padStart(2, '0');
+      const seconds = (data.totalTime % 60).toString().padStart(2, '0');
+      const timeString = `${minutes}:${seconds}`;
+      // total-time-value のようなIDを持つ要素に時間を設定することを想定
+      const timeElement = document.getElementById('total-time-value');
+      if (timeElement) {
+        timeElement.textContent = timeString;
+      }
+    }
+
     // モードに応じて表示を切り替える
     if (mode === 'presenter' || mode === 'creator') {
       // プレゼンター/クリエイターモードの処理
@@ -72,6 +84,51 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         newIdeasList.appendChild(li);
       });
     }
+
+    // ★★★ 変更点: アコーディオンロジックを追加 ★★★
+    if (data.feedbackHistory && data.feedbackHistory.length > 0) {
+      const historyContainer = document.getElementById('feedback-history-container');
+      const historyLogContainer = document.getElementById('feedback-history-log');
+      const toggleButton = document.getElementById('accordion-toggle-button');
+      const contentPanel = document.getElementById('accordion-content-panel');
+
+      // コンテナをクリア
+      historyLogContainer.innerHTML = ''; 
+
+      // 履歴データをHTMLに変換して挿入
+      data.feedbackHistory.forEach(entry => {
+        const entryDiv = document.createElement('div');
+        entryDiv.className = 'feedback-entry';
+
+        const userP = document.createElement('p');
+        userP.className = 'user-transcript';
+        userP.textContent = `あなた: ${entry.transcript}`;
+
+        const aiP = document.createElement('p');
+        aiP.className = 'ai-feedback';
+        aiP.textContent = `AI: ${entry.feedback}`;
+
+        entryDiv.appendChild(userP);
+        entryDiv.appendChild(aiP);
+        historyLogContainer.appendChild(entryDiv);
+      });
+
+      // 履歴があるので、アコーディオン全体を表示
+      historyContainer.style.display = 'block';
+
+      // クリックイベントを設定
+      toggleButton.addEventListener('click', () => {
+        toggleButton.classList.toggle('active');
+        if (contentPanel.style.display === 'block') {
+          contentPanel.style.display = 'none';
+          toggleButton.textContent = '履歴を開く';
+        } else {
+          contentPanel.style.display = 'block';
+          toggleButton.textContent = '履歴を閉じる';
+        }
+      });
+    }
+
   } else if (request.type === 'show_summary_error') {
     // ローディングを非表示にし、エラーを表示
     loader.style.display = 'none';

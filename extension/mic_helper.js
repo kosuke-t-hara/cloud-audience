@@ -8,15 +8,16 @@
   console.log("表情分析モード:", isFaceAnalysisEnabled ? "有効" : "無効");
 
   let stream = null;
-  let frameCaptureInterval = null;
   let recorder = null;
   let audioContext = null;
+  let vadNode = null; // vadNodeをグローバルスコープでアクセス可能に
 
   try {
-    // [修正点1] サーバーの仕様に合わせてサンプリングレートを48000に指定
     const constraints = {
       audio: {
-        sampleRate: 48000
+        sampleRate: 48000,
+        noiseSuppression: true,
+        echoCancellation: true
       }
     };
     if (isFaceAnalysisEnabled) {
@@ -24,155 +25,137 @@
     }
     console.log("メディアデバイスに要求する制約:", constraints);
     stream = await navigator.mediaDevices.getUserMedia(constraints);
+    console.log("[mic_helper] getUserMedia 成功");
 
-    // --- 1. 音声処理のセットアップを先に行う ---
-    const audioTracks = stream.getAudioTracks();
-    if (audioTracks.length === 0) {
-      throw new Error("音声トラックが見つかりません。");
-    }
-    const audioStream = new MediaStream(audioTracks);
-
-    // [修正点2] サーバーの仕様に合わせてエンコーディングを'audio/webm;codecs=opus'に指定
+    const audioStream = new MediaStream(stream.getAudioTracks());
     const mimeType = 'audio/webm;codecs=opus';
     if (!MediaRecorder.isTypeSupported(mimeType)) {
       console.error(`${mimeType} はサポートされていません。`);
-      alert(`${mimeType} はお使いのブラウザではサポートされていません。`);
       return;
     }
     recorder = new MediaRecorder(audioStream, { mimeType: mimeType });
+    console.log("[mic_helper] MediaRecorderの初期化完了");
 
-    // [復元点1] 最大録音時間とタイマー
-    const MAX_RECORDING_DURATION = 45000; // 45秒
-    let recordingTimer;
+    // [エラーハンドリング強化] AudioWorkletのセットアップ
+    try {
+      audioContext = new AudioContext({ sampleRate: 48000 });
+      audioContext.onprocessorerror = (event) => {
+        console.error(`[AudioContext] processorerrorイベント:`, event);
+      };
 
-    recorder.onstart = () => {
-      console.log("録音チャンクを開始しました。");
-      recordingTimer = setTimeout(() => {
-        if (recorder.state === 'recording') {
-          console.log("最大録音時間に達したため、音声を区切ります。");
-          recorder.stop();
+      console.log("[mic_helper] AudioWorkletモジュールを読み込みます: vad-processor.js");
+      await audioContext.audioWorklet.addModule('vad-processor.js');
+      console.log("[mic_helper] AudioWorkletモジュールの読み込みに成功しました。");
+
+      // ★★★ 追加: ストレージから設定値を読み込む ★★★
+      const settings = await new Promise(resolve => {
+        chrome.storage.local.get({ silenceThreshold: 0.02, pauseDuration: 5 }, result => resolve(result));
+      });
+      const silenceThreshold = parseFloat(settings.silenceThreshold);
+      const pauseDuration = parseInt(settings.pauseDuration, 10) * 1000; // 秒をミリ秒に変換
+      console.log(`[mic_helper] ストレージから読み込んだsilenceThreshold: ${silenceThreshold}`);
+      console.log(`[mic_helper] ストレージから読み込んだpauseDuration: ${pauseDuration}ms`);
+
+      const source = audioContext.createMediaStreamSource(audioStream);
+      vadNode = new AudioWorkletNode(audioContext, 'vad-processor', {
+        processorOptions: {
+          silenceThreshold: silenceThreshold, // ★ 読み込んだ値を使用
+          pauseDuration: pauseDuration       // ★ 読み込んだ値を使用
         }
-      }, MAX_RECORDING_DURATION);
-    };
+      });
+      console.log("[mic_helper] AudioWorkletNodeの作成完了");
 
-    // [復元点2] 無音検知ロジック (AnalyserNode)
-    audioContext = new AudioContext({ sampleRate: 48000 });
-    const source = audioContext.createMediaStreamSource(audioStream);
-    const analyser = audioContext.createAnalyser();
-    analyser.fftSize = 256;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    source.connect(analyser);
+      vadNode.onprocessorerror = (event) => {
+        console.error(`[VADNode] onprocessorerrorイベント:`, event);
+      };
 
-    let silenceStart = performance.now();
-    const SILENCE_THRESHOLD = 5000; // この値は環境に応じて調整が必要な場合があります
-    const PAUSE_DURATION = 3000;    // 3秒の無音で区切る
-
-    function detectSilence() {
-      // 録音が停止しているか、ストリームが非アクティブならループを止める
-      if (recorder.state !== 'recording' || !stream.active) {
-        return;
-      }
-      analyser.getByteFrequencyData(dataArray);
-      let sum = dataArray.reduce((a, b) => a + b, 0);
-      if (sum < SILENCE_THRESHOLD) {
-        if (performance.now() - silenceStart > PAUSE_DURATION) {
+      vadNode.port.onmessage = (event) => {
+        // ★★★ デバッグログ ★★★
+        console.log(`[mic_helper] VADNodeからメッセージを受信:`, event.data);
+        if (event.data === 'silence') {
+          // ★★★ 追加: ストップウォッチを停止し、経過時間を表示 ★★★
+          console.timeEnd("VAD Silence Timer"); 
+          
           if (recorder.state === 'recording') {
-            console.log("「間」を検知しました。音声を区切ります。");
+            console.log("[mic_helper] 無音を検知。recorder.stop()を呼び出します。");
             recorder.stop();
-            silenceStart = performance.now(); // 時間をリセット
+          } else {
+            console.warn("[mic_helper] 無音を検知しましたが、recorderの状態が 'recording' ではありませんでした。現在の状態:", recorder.state);
           }
         }
-      } else {
-        silenceStart = performance.now();
-      }
-      requestAnimationFrame(detectSilence);
+      };
+      console.log("[mic_helper] VADNodeのポートにメッセージリスナーを設定しました。");
+
+      source.connect(vadNode);
+      vadNode.connect(audioContext.destination);
+      console.log("[mic_helper] AudioWorkletのセットアップが正常に完了しました。");
+
+    } catch (error) {
+      console.error("AudioWorkletのセットアップ中に致命的なエラーが発生しました:", error);
+      alert("無音検知機能の初期化に失敗しました。詳細はコンソールを確認してください。");
     }
 
+    // MediaRecorderのイベントハンドラ
     recorder.ondataavailable = (e) => {
+      // ★★★ デバッグログ ★★★
+      console.log(`[mic_helper] ondataavailableイベント発生: データサイズ=${e.data.size}`);
       if (e.data.size > 0) {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64Audio = reader.result.split(',')[1];
+          // ★★★ デバッグログ ★★★
+          console.log(`[mic_helper] Base64エンコード完了。background.jsに送信します。データ長=${base64Audio.length}`);
           chrome.runtime.sendMessage({ type: 'audio_chunk', data: base64Audio });
         };
         reader.readAsDataURL(e.data);
+      } else {
+        console.log("[mic_helper] ondataavailable: データサイズが0のため送信しません。");
       }
     };
 
-    // [復元点3] 録音の自動再開ロジック
     recorder.onstop = () => {
-      clearTimeout(recordingTimer);
-      if (stream.active) { // ストリームがアクティブな場合のみ録音を再開
+      // ★★★ デバッグログ ★★★
+      console.log("[mic_helper] onstopイベント発生。");
+      if (stream.active) {
+        if (vadNode) {
+          console.log("[mic_helper] VADプロセッサの状態をリセットします。");
+          vadNode.port.postMessage('reset');
+        }
+        console.log("[mic_helper] recorder.start()を呼び出して録音を再開します。");
         recorder.start();
+        
+        // ★★★ 追加: ストップウォッチを開始 ★★★
+        console.time("VAD Silence Timer");
+
+      } else {
+        console.log("[mic_helper] onstop: ストリームがアクティブでないため、録音は再開しません。");
       }
     };
 
-    recorder.onerror = (event) => {
-      console.error("MediaRecorderでエラーが発生しました:", event.error);
-      chrome.runtime.sendMessage({
-        type: 'mic_error',
-        error: {
-          name: event.error.name,
-          message: event.error.message
-        }
-      });
-    };
-
-    // --- 2. 表情分析が有効な場合のみ、映像処理のセットアップを行う ---
-    if (isFaceAnalysisEnabled && stream.getVideoTracks().length > 0) {
-      console.log("映像トラックのセットアップを開始します。");
-      const videoElement = document.createElement('video');
-      videoElement.srcObject = stream;
-      videoElement.muted = true;
-      videoElement.play();
-
-      const canvasElement = document.createElement('canvas');
-      const context = canvasElement.getContext('2d');
-
-      frameCaptureInterval = setInterval(() => {
-        if (videoElement.readyState >= videoElement.HAVE_METADATA) {
-          canvasElement.width = videoElement.videoWidth;
-          canvasElement.height = videoElement.videoHeight;
-          context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-          const frameDataUrl = canvasElement.toDataURL('image/jpeg', 0.8);
-          chrome.runtime.sendMessage({ type: 'video_frame', data: frameDataUrl.split(',')[1] });
-        }
-      }, 5000);
-    }
-
-    // --- 3. 録音と監視を開始 ---
     recorder.start();
-    detectSilence();
-    console.log("Smart MediaRecorderによる音声処理を開始しました。");
+    // ★★★ 追加: ストップウォッチを初回開始 ★★★
+    console.time("VAD Silence Timer");
+    console.log(`[mic_helper] recorder.start() を初回呼び出し。録音を開始しました。現在の状態: ${recorder.state}`);
 
   } catch (err) {
-    console.error("マイクまたはカメラの取得に失敗:", err);
-    chrome.runtime.sendMessage({
-      type: 'mic_error',
-      error: {
-        name: err.name,
-        message: err.message
-      }
-    });
+    console.error("[mic_helper] 初期化処理中にエラーが発生:", err);
   }
 
-  // --- 4. 停止命令のリスナー ---
+  // 停止命令のリスナー
   chrome.runtime.onMessage.addListener((request) => {
     if (request.type === 'stop_recording') {
-      console.log("録音を停止します。");
-      if (frameCaptureInterval) {
-        clearInterval(frameCaptureInterval);
-      }
-      // ストリームを停止すると.activeがfalseになり、onstopでの自動再開が止まる
+      console.log("[mic_helper] 録音停止命令を受信");
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
+        console.log("[mic_helper] 全てのメディアトラックを停止しました。");
       }
       if (recorder && recorder.state === 'recording') {
+        console.log("[mic_helper] recorder.stop() を呼び出します (最終)。");
         recorder.stop();
       }
       if (audioContext) {
         audioContext.close();
+        console.log("[mic_helper] AudioContextを閉じました。");
       }
       window.close();
     }

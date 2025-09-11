@@ -17,6 +17,7 @@ let latestVideoFrame = null; // 最新のカメラ映像を保存する変数
 let isFaceAnalysisEnabled = true; // 表情分析が有効かどうかのフラグ
 
 let sessionAnalysisResults = []; // 分析結果を蓄積する配列
+let sessionFeedbackHistory = []; // ★ 追加: フィードバック履歴を蓄積する配列
 let currentFeedbackMode = 'realtime'; // フィードバックモード
 let consecutiveFailures = 0; // ★ 音声認識の連続失敗回数をカウント
 
@@ -49,6 +50,7 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis) {
   conversationHistory = [];
   conversationSummary = ""; // ★ 練習開始時に要約をリセット
   sessionAnalysisResults = [];
+  sessionFeedbackHistory = []; // ★ 追加: 練習開始時にフィードバック履歴をリセット
   elapsedTimeInSeconds = 0;
   consecutiveFailures = 0; // ★ カウンターをリセット
 
@@ -112,8 +114,8 @@ function stopRecording(sendResponseCallback) {
     helperWindowId = null;
   }
 
-  // ★ generateSummary に conversationSummary を渡す
-  generateSummary(sessionAnalysisResults, conversationSummary);
+  // ★ generateSummary に conversationSummary, elapsedTimeInSeconds, sessionFeedbackHistory を渡す
+  generateSummary(sessionAnalysisResults, conversationSummary, elapsedTimeInSeconds, sessionFeedbackHistory);
 }
 
 chrome.windows.onRemoved.addListener((windowId) => {
@@ -156,15 +158,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function handleAudioChunk(audioContent) {
+  // ★★★ 修正点: 録音が停止されていたら、後続の処理をすべて中断する ★★★
+  if (!isRecording) {
+    console.log("録音停止後にhandleAudioChunkが呼ばれましたが、処理を中断しました。");
+    return;
+  }
+
   try {
     const screenshot = await captureVisibleTab();
     
+    // ★★★ 修正点: screenshotがnullの場合を考慮 ★★★
+    const imageContent = screenshot ? screenshot.split(',')[1] : null;
+
     const requestBody = {
       type: 'realtime-feedback',
       mode: currentMode,
       persona: currentPersona,
       audioContent: audioContent,
-      imageContent: screenshot.split(',')[1],
+      imageContent: imageContent, // nullまたはBase64データ
       history: conversationHistory,
       conversationSummary: conversationSummary // ★ 現在の要約を送信
     };
@@ -183,7 +194,7 @@ async function handleAudioChunk(audioContent) {
     console.log("Cloud Functionからの応答データ:", data);
 
     // ★ 音声認識の失敗を監視
-    const MAX_CONSECUTIVE_FAILURES = 3;
+    const MAX_CONSECUTIVE_FAILURES = 5;
     if (!data.transcript || data.transcript.trim() === "") {
       consecutiveFailures++;
       console.log(`音声認識失敗が連続 ${consecutiveFailures} 回目です。`);
@@ -213,6 +224,12 @@ async function handleAudioChunk(audioContent) {
     }
 
     if (data.feedback) {
+      // ★ 追加: フィードバック履歴を保存 (発言と応答のペア)
+      sessionFeedbackHistory.push({
+        transcript: data.transcript,
+        feedback: data.feedback
+      });
+
       conversationHistory.push({ role: 'user', parts: [{ text: data.transcript }] });
       conversationHistory.push({ role: 'model', parts: [{ text: data.feedback }] });
       fullTranscript += data.transcript + " ";
@@ -239,16 +256,21 @@ async function handleAudioChunk(audioContent) {
 }
 
 function captureVisibleTab() {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => { // ★ reject を削除
     chrome.tabs.captureVisibleTab(null, { format: 'jpeg', quality: 80 }, (dataUrl) => {
-      if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
+      // ★ エラーが発生した場合は、コンソールに警告を出し、null を返す
+      if (chrome.runtime.lastError) {
+        console.warn("スクリーンショットの撮影に失敗しました:", chrome.runtime.lastError.message);
+        resolve(null);
+        return;
+      }
       resolve(dataUrl);
     });
   });
 }
 
-// ★ generateSummary が conversationSummary を受け取るように変更
-async function generateSummary(analysisResults, finalConversationSummary) {
+// ★ generateSummary が feedbackHistory を受け取るように変更
+async function generateSummary(analysisResults, finalConversationSummary, totalTime, feedbackHistory) {
   const summaryTab = await chrome.tabs.create({ url: 'summary.html' });
 
   if (analysisResults.length === 0) {
@@ -269,7 +291,8 @@ async function generateSummary(analysisResults, finalConversationSummary) {
         analysisResults: analysisResults,
         mode: currentMode,
         persona: currentPersona,
-        conversationSummary: finalConversationSummary // ★ 最終的な要約を送信
+        conversationSummary: finalConversationSummary, // ★ 最終的な要約を送信
+        totalTime: totalTime // ★ 経過時間を追加
       })
     });
 
@@ -283,7 +306,12 @@ async function generateSummary(analysisResults, finalConversationSummary) {
     const summaryData = await response.json();
     console.log("サマリー生成結果:", summaryData);
     setTimeout(() => {
-      chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary', data: summaryData, mode: currentMode });
+      // ★ summary.jsに渡すデータに feedbackHistory を追加
+      chrome.tabs.sendMessage(summaryTab.id, { 
+        type: 'show_summary', 
+        data: { ...summaryData, feedbackHistory: feedbackHistory }, 
+        mode: currentMode 
+      });
     }, 500);
 
   } catch (error) {

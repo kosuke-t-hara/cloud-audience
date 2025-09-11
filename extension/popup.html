@@ -178,6 +178,23 @@
     #stopButton:hover {
       background-color: #EFEFEF;
     }
+
+    /* === スライダーのスタイル === */
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slider-container input[type="range"] {
+      flex-grow: 1;
+      margin: 0;
+    }
+    .slider-container span {
+      font-size: 12px;
+      font-family: monospace;
+      min-width: 40px; /* 幅を固定してUIのガタつきを防ぐ */
+      text-align: right;
+    }
   </style>
 </head>
 
@@ -250,6 +267,22 @@
 
       <input type="radio" id="face-analysis-off" name="face_analysis" value="off">
       <label for="face-analysis-off">オフ</label>
+    </div>
+  </div>
+
+  <div class="setting-section">
+    <label for="silence-threshold-slider" class="setting-label">マイク感度調整 (無音検知)</label>
+    <div class="slider-container">
+      <input type="range" id="silence-threshold-slider" min="0.005" max="1.0" step="0.020" value="0.02">
+      <span id="silence-threshold-value">0.020</span>
+    </div>
+  </div>
+
+  <div class="setting-section">
+    <label for="pause-duration-slider" class="setting-label">無音検知時間 (秒)</label>
+    <div class="slider-container">
+      <input type="range" id="pause-duration-slider" min="2" max="10" step="1" value="5">
+      <span id="pause-duration-value">5</span>
     </div>
   </div>
 

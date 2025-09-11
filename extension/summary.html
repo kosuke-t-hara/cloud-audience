@@ -60,6 +60,51 @@
       border: 1px solid #6750A4; /* 紫色のボーダー */
     }
 
+    /* === フィードバック履歴のスタイル === */
+    #feedback-history-log .feedback-entry {
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    #feedback-history-log .feedback-entry:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    #feedback-history-log .user-transcript {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    #feedback-history-log .ai-feedback {
+      padding-left: 16px;
+      border-left: 3px solid #4285F4;
+      color: #555;
+    }
+
+    /* === アコーディオンのスタイル === */
+    .accordion-toggle {
+      background-color: #f1f1f1;
+      color: #444;
+      cursor: pointer;
+      padding: 16px;
+      width: 100%;
+      border: none;
+      text-align: left;
+      outline: none;
+      font-size: 15px;
+      transition: background-color 0.2s;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+    .accordion-toggle:hover, .accordion-toggle.active {
+      background-color: #ddd;
+    }
+    .accordion-content {
+      overflow: hidden;
+      padding-top: 10px;
+    }
+
     #loader {
       border: 16px solid #f3f3f3;
       border-radius: 50%;
@@ -113,6 +158,7 @@
       <div class="card">
         <p><strong>平均話速:</strong> <span id="speaking-rate"></span> 文字/分</p>
         <p><strong>フィラーワード:</strong> <span id="filler-words-count"></span> 回</p>
+        <p><strong>合計練習時間:</strong> <span id="total-time-value">--:--</span></p>
       </div>
 
       <h2><span style="color: #34A853;">✔</span> ポジティブなハイライト</h2>
@@ -124,6 +170,18 @@
       <div class="card persona-comment-card">
         <p id="personaComment"></p>
       </div>
+
+      <!-- ▼▼▼ 変更点: アコーディオン構造の追加 ▼▼▼ -->
+      <div id="feedback-history-container" style="display: none;">
+        <h2>フィードバック履歴</h2>
+        <button id="accordion-toggle-button" class="accordion-toggle">履歴を開く</button>
+        <div id="accordion-content-panel" class="accordion-content" style="display: none;">
+          <div class="card" id="feedback-history-log">
+            <!-- ここにJavaScriptで履歴が挿入されます -->
+          </div>
+        </div>
+      </div>
+      <!-- ▲▲▲ ここまで ▲▲▲ -->
     </div>
 
     <div id="thinking-summary" style="display: none;">

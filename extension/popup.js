@@ -5,6 +5,11 @@ document.addEventListener('DOMContentLoaded', function() {
   const modeRadios = document.querySelectorAll('input[name="mode"]');
   const presenterPersonaInput = document.getElementById('presenter-persona-input');
   const personaText = document.getElementById('persona-text');
+  // ★★★ 追加: スライダー関連の要素を取得 ★★★
+  const thresholdSlider = document.getElementById('silence-threshold-slider');
+  const thresholdValueSpan = document.getElementById('silence-threshold-value');
+  const pauseDurationSlider = document.getElementById('pause-duration-slider');
+  const pauseDurationValueSpan = document.getElementById('pause-duration-value');
 
   // ▼▼▼ ラジオボタン変更時の表示制御を追加 ▼▼▼
   function togglePersonaInput() {
@@ -54,6 +59,35 @@ document.addEventListener('DOMContentLoaded', function() {
       document.querySelector(`input[name="face_analysis"][value="${result.lastFaceAnalysis}"]`).checked = true;
     }
   });
+
+  // ★★★ 追加: スライダーの値を読み込んでUIに反映 ★★★
+  chrome.storage.local.get({ silenceThreshold: 0.02 }, (result) => {
+    const value = parseFloat(result.silenceThreshold);
+    thresholdSlider.value = value;
+    thresholdValueSpan.textContent = value.toFixed(3);
+  });
+
+  // ★★★ 追加: スライダー操作時のイベントリスナー ★★★
+  thresholdSlider.addEventListener('input', () => {
+    const value = parseFloat(thresholdSlider.value);
+    thresholdValueSpan.textContent = value.toFixed(3);
+    chrome.storage.local.set({ silenceThreshold: value });
+  });
+
+  // ★★★ 追加: 無音検知時間スライダーの値を読み込んでUIに反映 ★★★
+  chrome.storage.local.get({ pauseDuration: 5 }, (result) => {
+    const value = parseInt(result.pauseDuration, 10);
+    pauseDurationSlider.value = value;
+    pauseDurationValueSpan.textContent = value;
+  });
+
+  // ★★★ 追加: 無音検知時間スライダー操作時のイベントリスナー ★★★
+  pauseDurationSlider.addEventListener('input', () => {
+    const value = parseInt(pauseDurationSlider.value, 10);
+    pauseDurationValueSpan.textContent = value;
+    chrome.storage.local.set({ pauseDuration: value });
+  });
+
 
   startButton.addEventListener('click', () => {
     // ▼▼▼ 選択された言語を取得 ▼▼▼

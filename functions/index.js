@@ -120,13 +120,19 @@ async function getGeminiVisionFeedback(text, image, mode, history, facialFeedbac
 
   const requestBody = {
     contents: [{ parts: [
-      { text: prompt },
-      { inline_data: { mime_type: 'image/jpeg', data: image } }
+      { text: prompt }
+      // ★★★ 修正点: imageが存在する場合のみ、inline_dataを追加 ★★★
     ]}],
     generationConfig: {
       responseMimeType: "application/json",
     }
   };
+
+  if (image) {
+    requestBody.contents[0].parts.push({
+      inline_data: { mime_type: 'image/jpeg', data: image }
+    });
+  }
 
   const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -383,7 +389,7 @@ functions.http('coachApi', async (req, res) => {
       });
 
     } else if (type === 'summary-report') {
-      const { analysisResults, conversationSummary } = req.body;
+      const { analysisResults, conversationSummary, totalTime } = req.body; // ★ totalTime を受け取る
 
       const combinedResults = {
         fullTranscript: analysisResults.map(r => r.fullTranscript).join(' '),
@@ -401,7 +407,8 @@ functions.http('coachApi', async (req, res) => {
       const summaryResult = await getGeminiSummary(combinedResults, sentiment, mode, persona, conversationSummary);
 
       if (summaryResult.success) {
-        res.status(200).send(summaryResult.data);
+        // ★ レスポンスに totalTime を追加
+        res.status(200).send({ ...summaryResult.data, totalTime: totalTime });
       } else {
         res.status(500).send({ error: "サマリーの生成に失敗しました。", details: summaryResult.error, rawDetails: summaryResult.details });
       }
@@ -414,9 +421,12 @@ functions.http('coachApi', async (req, res) => {
 // Speech-to-Text関数
 async function transcribeAudio(audioContent) {
   try {
+    // ★★★ 修正点: Base64デコード処理を追加 ★★★
+    const audioBytes = Buffer.from(audioContent, 'base64');
+
     const request = {
       audio: {
-        content: audioContent,
+        content: audioBytes, // デコードしたデータを渡す
       },
       config: {
         encoding: 'WEBM_OPUS',
