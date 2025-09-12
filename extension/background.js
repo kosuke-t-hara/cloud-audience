@@ -25,6 +25,9 @@ let consecutiveFailures = 0; // ★ 音声認識の連続失敗回数をカウ�
 let timerInterval = null;
 let elapsedTimeInSeconds = 0;
 
+// ★★★ 追加: 保留中のサマリージョブを保存するオブジェクト ★★★
+const pendingSummaries = {};
+
 // ショートカットキーのリスナー
 chrome.commands.onCommand.addListener((command) => {
   if (command === "toggle_recording") {
@@ -94,9 +97,10 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis) {
   });
 }
 
+// ★★★ 修正: stopRequestSendResponse の管理方法を変更 ★★★
 function stopRecording(sendResponseCallback) {
   isRecording = false;
-  stopRequestSendResponse = sendResponseCallback;
+  // stopRequestSendResponse = sendResponseCallback; // ← この行を削除
 
   chrome.action.setBadgeText({ text: '...' });
   chrome.action.setBadgeBackgroundColor({ color: '#FFA500' });
@@ -114,8 +118,8 @@ function stopRecording(sendResponseCallback) {
     helperWindowId = null;
   }
 
-  // ★ generateSummary に conversationSummary, elapsedTimeInSeconds, sessionFeedbackHistory を渡す
-  generateSummary(sessionAnalysisResults, conversationSummary, elapsedTimeInSeconds, sessionFeedbackHistory);
+  // ★★★ 修正: generateSummary に sendResponseCallback を渡す ★★★
+  generateSummary(sessionAnalysisResults, conversationSummary, elapsedTimeInSeconds, sessionFeedbackHistory, sendResponseCallback);
 }
 
 chrome.windows.onRemoved.addListener((windowId) => {
@@ -158,7 +162,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function handleAudioChunk(audioContent) {
-  // ★★★ 修正点: 録音が停止されていたら、後続の処理をすべて中断する ★★★
   if (!isRecording) {
     console.log("録音停止後にhandleAudioChunkが呼ばれましたが、処理を中断しました。");
     return;
@@ -166,8 +169,6 @@ async function handleAudioChunk(audioContent) {
 
   try {
     const screenshot = await captureVisibleTab();
-    
-    // ★★★ 修正点: screenshotがnullの場合を考慮 ★★★
     const imageContent = screenshot ? screenshot.split(',')[1] : null;
 
     const requestBody = {
@@ -175,9 +176,9 @@ async function handleAudioChunk(audioContent) {
       mode: currentMode,
       persona: currentPersona,
       audioContent: audioContent,
-      imageContent: imageContent, // nullまたはBase64データ
+      imageContent: imageContent,
       history: conversationHistory,
-      conversationSummary: conversationSummary // ★ 現在の要約を送信
+      conversationSummary: conversationSummary
     };
 
     if (isFaceAnalysisEnabled) {
@@ -193,13 +194,10 @@ async function handleAudioChunk(audioContent) {
 
     console.log("Cloud Functionからの応答データ:", data);
 
-    // ★ 音声認識の失敗を監視
     const MAX_CONSECUTIVE_FAILURES = 5;
     if (!data.transcript || data.transcript.trim() === "") {
       consecutiveFailures++;
-      console.log(`音声認識失敗が連続 ${consecutiveFailures} 回目です。`);
       if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        console.log("音声認識の連続失敗が上限に達したため、録音を停止します。");
         stopRecording();
         if (targetTabId) {
           chrome.tabs.sendMessage(targetTabId, {
@@ -210,13 +208,11 @@ async function handleAudioChunk(audioContent) {
         return;
       }
     } else {
-      consecutiveFailures = 0; // 成功したらリセット
+      consecutiveFailures = 0;
     }
 
-    // ★ 新しい要約を受け取り、更新する
     if (data.newConversationSummary) {
       conversationSummary = data.newConversationSummary;
-      console.log("会話の要約を更新しました:", conversationSummary);
     }
 
     if (data.analysisData) {
@@ -224,7 +220,6 @@ async function handleAudioChunk(audioContent) {
     }
 
     if (data.feedback) {
-      // ★ 追加: フィードバック履歴を保存 (発言と応答のペア)
       sessionFeedbackHistory.push({
         transcript: data.transcript,
         feedback: data.feedback
@@ -238,8 +233,6 @@ async function handleAudioChunk(audioContent) {
         case 'realtime':
           if (targetTabId) {
             chrome.tabs.sendMessage(targetTabId, { type: 'show-feedback', data: data.feedback });
-          } else {
-            console.error("フィードバック表示先のタブが見つかりません。");
           }
           break;
         case 'badge':
@@ -256,9 +249,8 @@ async function handleAudioChunk(audioContent) {
 }
 
 function captureVisibleTab() {
-  return new Promise((resolve) => { // ★ reject を削除
+  return new Promise((resolve) => {
     chrome.tabs.captureVisibleTab(null, { format: 'jpeg', quality: 80 }, (dataUrl) => {
-      // ★ エラーが発生した場合は、コンソールに警告を出し、null を返す
       if (chrome.runtime.lastError) {
         console.warn("スクリーンショットの撮影に失敗しました:", chrome.runtime.lastError.message);
         resolve(null);
@@ -269,58 +261,84 @@ function captureVisibleTab() {
   });
 }
 
-// ★ generateSummary が feedbackHistory を受け取るように変更
-async function generateSummary(analysisResults, finalConversationSummary, totalTime, feedbackHistory) {
-  const summaryTab = await chrome.tabs.create({ url: 'summary.html' });
+// ★★★ 修正: generateSummary のロジックを全面的に変更 ★★★
+async function generateSummary(analysisResults, finalConversationSummary, totalTime, feedbackHistory, sendResponseCallback) {
+  // 先にタブを開き、ユーザーに待機状態を示す
+  const summaryTab = await chrome.tabs.create({ url: 'summary.html', active: false });
 
-  if (analysisResults.length === 0) {
-    console.log("分析データがなかったため、サマリーを生成しませんでした。");
-    setTimeout(() => {
-        chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary_error', error: '分析データがありませんでした。' });
-    }, 500);
-    return;
-  }
-  console.log("サマリーを生成します。分析結果:", analysisResults);
-
-  try {
-    const response = await fetch(CLOUD_FUNCTION_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'summary-report',
-        analysisResults: analysisResults,
-        mode: currentMode,
-        persona: currentPersona,
-        conversationSummary: finalConversationSummary, // ★ 最終的な要約を送信
-        totalTime: totalTime // ★ 経過時間を追加
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: "サーバーから不明なエラー応答", details: response.statusText }));
-      console.error("サマリー生成APIエラー:", errorData);
-      chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary_error', error: errorData.error, details: errorData.details });
-      return;
-    }
-
-    const summaryData = await response.json();
-    console.log("サマリー生成結果:", summaryData);
-    setTimeout(() => {
-      // ★ summary.jsに渡すデータに feedbackHistory を追加
-      chrome.tabs.sendMessage(summaryTab.id, { 
-        type: 'show_summary', 
-        data: { ...summaryData, feedbackHistory: feedbackHistory }, 
-        mode: currentMode 
-      });
-    }, 500);
-
-  } catch (error) {
-    console.error('サマリーの生成に失敗しました:', error);
-    chrome.tabs.sendMessage(summaryTab.id, { type: 'show_summary_error', error: 'サマリーの生成に失敗しました。', details: error.message });
-  } finally {
-    if (stopRequestSendResponse) {
-      stopRequestSendResponse({ message: "処理が完了しました。" });
-      stopRequestSendResponse = null;
-    }
-  }
+  // pendingSummaries にジョブ情報を保存
+  pendingSummaries[summaryTab.id] = {
+    analysisResults,
+    finalConversationSummary,
+    totalTime,
+    feedbackHistory,
+    mode: currentMode,
+    persona: currentPersona,
+    sendResponseCallback // popup.jsへのコールバックを保存
+  };
+  
+  // タブをアクティブにする
+  chrome.tabs.update(summaryTab.id, { active: true });
 }
+
+// ★★★ 追加: タブの更新を監視するリスナー ★★★
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // タブの読み込みが完了し、かつ保留中のサマリージョブがある場合
+  if (changeInfo.status === 'complete' && pendingSummaries[tabId]) {
+    const job = pendingSummaries[tabId];
+    // 複数回発火しないように、すぐにジョブを削除
+    delete pendingSummaries[tabId];
+
+    try {
+      // 分析データがない場合はエラーを表示
+      if (job.analysisResults.length === 0) {
+        console.log("分析データがなかったため、サマリーを生成しませんでした。");
+        chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: '十分な分析データがありませんでした。' });
+        return;
+      }
+
+      console.log("サマリー生成を開始します。分析結果:", job.analysisResults);
+
+      // Cloud Function を呼び出してサマリーを生成
+      const response = await fetch(CLOUD_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'summary-report',
+          analysisResults: job.analysisResults,
+          mode: job.mode,
+          persona: job.persona,
+          conversationSummary: job.finalConversationSummary,
+          totalTime: job.totalTime
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "サーバーから不明なエラー応答", details: response.statusText }));
+        console.error("サマリー生成APIエラー:", errorData);
+        chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: errorData.error, details: errorData.details });
+        return;
+      }
+
+      const summaryData = await response.json();
+      console.log("サマリー生成結果:", summaryData);
+      
+      // summary.js に最終的なデータを送信
+      chrome.tabs.sendMessage(tabId, {
+        type: 'show_summary',
+        data: { ...summaryData, feedbackHistory: job.feedbackHistory },
+        mode: job.mode
+      });
+
+    } catch (error) {
+      console.error('サマリーの生成に失敗しました:', error);
+      chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: 'サマリーの生成に失敗しました。', details: error.message });
+    } finally {
+      // 最後に popup.js に応答を返す
+      if (job.sendResponseCallback) {
+        job.sendResponseCallback({ message: "処理が完了しました。" });
+      }
+    }
+  }
+});
+""

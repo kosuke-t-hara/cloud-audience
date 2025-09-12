@@ -1,3 +1,14 @@
+let radarChart = null; // チャートインスタンスを保持する変数
+
+// ページが閉じられるときにチャートを破棄
+window.addEventListener('beforeunload', () => {
+  if (radarChart) {
+    radarChart.destroy();
+    radarChart = null;
+    console.log('Chart instance destroyed on page unload.');
+  }
+});
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const loader = document.getElementById('loader');
   const errorContainer = document.getElementById('error-container');
@@ -49,7 +60,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       const ctx = document.getElementById('radarChart').getContext('2d');
-      new Chart(ctx, {
+      if (radarChart) {
+        radarChart.destroy();
+      }
+      radarChart = new Chart(ctx, {
         type: 'radar',
         data: {
           labels: labels,
@@ -67,6 +81,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // AIからの質問リストを描画
       if (data.questions && data.questions.length > 0) {
         const questionsList = document.getElementById('questions-list-rating');
+        questionsList.innerHTML = ''; // Clear existing
         data.questions.forEach(question => {
           const li = document.createElement('li');
           li.textContent = question;
@@ -81,6 +96,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       document.getElementById('summary-text').textContent = data.summary_text;
       
       const keyPointsList = document.getElementById('key-points-list');
+      keyPointsList.innerHTML = ''; // Clear existing
       data.key_points.forEach(point => {
         const li = document.createElement('li');
         li.textContent = point;
@@ -88,6 +104,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
 
       const newIdeasList = document.getElementById('new-ideas-list');
+      newIdeasList.innerHTML = ''; // Clear existing
       data.new_ideas.forEach(idea => {
         const li = document.createElement('li');
         li.textContent = idea;
@@ -97,6 +114,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // AIからの質問リストを描画
       if (data.questions && data.questions.length > 0) {
         const questionsList = document.getElementById('questions-list-thinking');
+        questionsList.innerHTML = ''; // Clear existing
         data.questions.forEach(question => {
           const li = document.createElement('li');
           li.textContent = question;
