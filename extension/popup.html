@@ -26,12 +26,13 @@
       background-color: var(--surface-color);
       margin: 0;
       padding: 16px;
+      text-align: center;
     }
 
     /* === ヘッダー === */
     .header {
       text-align: center;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
 
     .header h3 {
@@ -40,62 +41,10 @@
       margin: 0;
     }
 
-    /* === モード選択 === */
-    .mode-selection {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    .mode-selection input[type="radio"] {
-      display: none;
-    }
-
-    .mode-selection label {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 12px 8px;
-      border: 1px solid var(--outline-color);
-      border-radius: 12px;
-      cursor: pointer;
-      transition: background-color 0.2s, border-color 0.2s;
-      text-align: center;
-      font-size: 12px;
-      font-weight: 500;
-    }
-
-    .mode-selection label .icon {
-      font-size: 24px;
-      margin-bottom: 4px;
-    }
-
-    .mode-selection input[type="radio"]:checked+label {
-      background-color: var(--secondary-color);
-      border-color: var(--primary-color);
-    }
-
-    /* === ペルソナ入力欄 === */
-    #presenter-persona-input {
-      margin-bottom: 16px;
-    }
-
-    #presenter-persona-input .setting-label {
-      font-size: 14px;
-      font-weight: 500;
-      margin-bottom: 8px;
-    }
-
-    #presenter-persona-input textarea {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 10px;
-      border: 1px solid var(--outline-color);
-      border-radius: 8px;
-      font-family: var(--body-font);
-      resize: vertical;
+    #user-info {
+        font-size: 12px;
+        margin-top: 4px;
+        color: #49454F;
     }
     
     /* === セクションの共通スタイル === */
@@ -110,73 +59,83 @@
       margin-bottom: 8px;
     }
 
-    /* ▼▼▼ ここからフィードバック方法のスタイルをまるごと追加 ▼▼▼ */
-    .feedback-mode-selection {
+    /* === セグメントコントロール === */
+    .segmented-control {
       display: flex;
-      gap: 8px;
-      justify-content: space-between;
+      width: 100%;
+      border-radius: 20px;
+      border: 1px solid var(--outline-color);
+      overflow: hidden;
     }
-
-    .feedback-mode-selection input[type="radio"] {
+    .segmented-control input[type="radio"] {
       display: none;
     }
-
-    .feedback-mode-selection label {
-      flex-grow: 1; /* ラベルが均等に幅を持つように */
+    .segmented-control label {
+      flex: 1;
       text-align: center;
-      padding: 8px 10px;
-      border: 1px solid var(--outline-color);
-      border-radius: 20px; /* 角を丸くしてチップ形状に */
+      padding: 8px 4px;
       font-size: 12px;
       font-weight: 500;
       cursor: pointer;
-      transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+      transition: background-color 0.2s, color 0.2s;
+      border-left: 1px solid var(--outline-color);
     }
-    
-    .feedback-mode-selection input[type="radio"]:checked + label {
+    .segmented-control label:first-of-type {
+      border-left: none;
+    }
+    .segmented-control input[type="radio"]:checked + label {
       background-color: var(--secondary-color);
-      border-color: var(--primary-color);
       color: var(--primary-color);
     }
-    /* ▲▲▲ ここまで追加 ▲▲▲ */
 
-
-    /* === アクションボタン === */
-    .action-buttons {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-top: 24px; /* ボタンの上の余白を少し広げる */
-    }
-
-    .action-buttons button {
-      width: 100%;
-      padding: 12px;
-      font-size: 14px;
-      font-weight: 700;
+    /* === アコーディオン === */
+    .accordion-toggle {
+      background-color: #F3EDF7;
+      color: var(--text-color);
       cursor: pointer;
+      padding: 12px 16px;
+      width: 100%;
       border: none;
-      border-radius: 16px;
+      border-radius: 12px;
+      text-align: left;
+      outline: none;
+      font-size: 14px;
+      font-weight: 500;
       transition: background-color 0.2s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .accordion-toggle:hover {
+      background-color: #E8DEF8;
+    }
+    .accordion-toggle::after {
+      content: '▼'; /* 開く前のアイコン */
+      font-size: 10px;
+      transition: transform 0.2s;
+    }
+    .accordion-toggle.active::after {
+      transform: rotate(180deg); /* 開いた後のアイコン */
+    }
+    .accordion-content {
+      padding: 12px 4px 4px 4px;
+      background-color: transparent;
+      overflow: hidden;
+      display: none; /* 初期状態は非表示 */
     }
 
-    #startButton {
-      background-color: var(--primary-color);
-      color: white;
+    /* === ペルソナ入力欄 === */
+    #persona-input-section {
+      margin-bottom: 16px;
     }
-
-    #startButton:hover {
-      opacity: 0.9;
-    }
-
-    #stopButton {
-      background-color: #F8F8F8;
-      color: var(--primary-color);
+    #persona-input-section textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
       border: 1px solid var(--outline-color);
-    }
-
-    #stopButton:hover {
-      background-color: #EFEFEF;
+      border-radius: 8px;
+      font-family: var(--body-font);
+      resize: vertical;
     }
 
     /* === スライダーのスタイル === */
@@ -192,9 +151,64 @@
     .slider-container span {
       font-size: 12px;
       font-family: monospace;
-      min-width: 40px; /* 幅を固定してUIのガタつきを防ぐ */
+      min-width: 40px;
       text-align: right;
     }
+
+    /* === アクションボタン === */
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 24px;
+    }
+    .action-buttons button {
+      width: 100%;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      border-radius: 16px;
+      transition: background-color 0.2s;
+    }
+    #startButton {
+      background-color: var(--primary-color);
+      color: white;
+    }
+    #startButton:hover {
+      opacity: 0.9;
+    }
+    #stopButton {
+      background-color: #F8F8F8;
+      color: var(--primary-color);
+      border: 1px solid var(--outline-color);
+    }
+    #stopButton:hover {
+      background-color: #EFEFEF;
+    }
+
+    /* === 認証関連 === */
+    #login-button {
+        background-color: #4285F4;
+        color: white;
+    }
+    #logout-button {
+        background: none;
+        border: none;
+        color: var(--primary-color);
+        text-decoration: underline;
+        cursor: pointer;
+        font-size: 12px;
+        margin-top: 8px;
+    }
+    .history-link {
+        font-size: 12px;
+        color: var(--primary-color);
+        margin-top: 16px;
+        display: inline-block;
+    }
+
   </style>
 </head>
 
@@ -202,95 +216,107 @@
 
   <div class="header">
     <h3>Prezento AI Coach</h3>
+    <div id="user-info"></div>
   </div>
 
-  <div class="setting-section">
-    <label class="setting-label">言語</label>
-    <div class="feedback-mode-selection"> <input type="radio" id="lang-ja" name="language" value="ja-JP" checked>
-      <label for="lang-ja">日本語</label>
+  <!-- Loading View -->
+  <div id="loading-view">
+    <p>読み込み中...</p>
+  </div>
 
-      <input type="radio" id="lang-en" name="language" value="en-US">
-      <label for="lang-en">English</label>
+  <!-- Logged Out View -->
+  <div id="logged-out-view" style="display: none;">
+    <p>機能を利用するにはログインしてください。</p>
+    <div class="action-buttons">
+        <button id="login-button">Googleでログイン</button>
     </div>
+    <a href="#" id="view-history-link-logged-out" class="history-link">練習履歴を見る</a>
   </div>
 
-  <div class="mode-selection">
-    <input type="radio" id="mode-presenter" name="mode" value="presenter" checked>
-    <label for="mode-presenter">
-      <span class="icon">👔</span>
-      プレゼンター
-    </label>
-
-    <input type="radio" id="mode-creator" name="mode" value="creator">
-    <label for="mode-creator">
-      <span class="icon">🎬</span>
-      クリエイター
-    </label>
-
-    <input type="radio" id="mode-thinking" name="mode" value="thinking">
-    <label for="mode-thinking">
-      <span class="icon">🧠</span>
-      思考パートナー
-    </label>
-
-    <input type="radio" id="mode-dialogue" name="mode" value="dialogue">
-    <label for="mode-dialogue">
-      <span class="icon">💬</span>
-      対話シミュ
-    </label>
-  </div>
-
-  <div id="presenter-persona-input" style="display: none;">
-    <label for="persona-text" class="setting-label">ペルソナ設定（任意）</label>
-    <textarea id="persona-text" rows="3" placeholder="例：この企画に投資するか判断する投資家"></textarea>
-  </div>
-
-  <div class="setting-section">
-    <label class="setting-label">フィードバック方法</label>
-    <div class="feedback-mode-selection">
-      <input type="radio" id="fb-realtime" name="feedback_mode" value="realtime" checked>
-      <label for="fb-realtime">リアルタイム</label>
-
-      <input type="radio" id="fb-badge" name="feedback_mode" value="badge">
-      <label for="fb-badge">バッジ通知</label>
-
-      <input type="radio" id="fb-summary" name="feedback_mode" value="summary">
-      <label for="fb-summary">サマリーのみ</label>
+  <!-- Logged In View -->
+  <div id="logged-in-view" style="display: none;">
+    <div class="setting-section">
+      <label class="setting-label">役割</label>
+      <div class="segmented-control">
+        <input type="radio" id="mode-presenter" name="mode" value="presenter" checked>
+        <label for="mode-presenter">プレゼンター</label>
+        <input type="radio" id="mode-creator" name="mode" value="creator">
+        <label for="mode-creator">クリエイター</label>
+        <input type="radio" id="mode-thinking" name="mode" value="thinking">
+        <label for="mode-thinking">思考パートナー</label>
+      </div>
     </div>
-  </div>
-
-  <div class="setting-section">
-    <label class="setting-label">表情分析</label>
-    <div class="feedback-mode-selection">
-      <input type="radio" id="face-analysis-on" name="face_analysis" value="on" checked>
-      <label for="face-analysis-on">オン</label>
-
-      <input type="radio" id="face-analysis-off" name="face_analysis" value="off">
-      <label for="face-analysis-off">オフ</label>
+  
+    <div class="setting-section">
+      <label class="setting-label">フィードバック方法</label>
+      <div class="segmented-control">
+        <input type="radio" id="fb-realtime" name="feedback_mode" value="realtime" checked>
+        <label for="fb-realtime">リアルタイム</label>
+        <input type="radio" id="fb-badge" name="feedback_mode" value="badge">
+        <label for="fb-badge">バッジ</label>
+        <input type="radio" id="fb-summary" name="feedback_mode" value="summary">
+        <label for="fb-summary">サマリーのみ</label>
+      </div>
     </div>
-  </div>
-
-  <div class="setting-section">
-    <label for="silence-threshold-slider" class="setting-label">マイク感度調整 (無音検知)</label>
-    <div class="slider-container">
-      <input type="range" id="silence-threshold-slider" min="0.005" max="1.0" step="0.020" value="0.02">
-      <span id="silence-threshold-value">0.020</span>
+  
+    <button type="button" class="accordion-toggle">詳細設定</button>
+    <div class="accordion-content">
+      <div id="persona-input-section" class="setting-section" style="display: none;">
+        <label for="persona-text" class="setting-label">ペルソナ設定（任意）</label>
+        <textarea id="persona-text" rows="3" placeholder="例：この企画に投資するか判断する投資家"></textarea>
+      </div>
+  
+      <div class="setting-section">
+        <label class="setting-label">言語</label>
+        <div class="segmented-control">
+          <input type="radio" id="lang-ja" name="language" value="ja-JP" checked>
+          <label for="lang-ja">日本語</label>
+          <input type="radio" id="lang-en" name="language" value="en-US">
+          <label for="lang-en">English</label>
+        </div>
+      </div>
+  
+      <div class="setting-section">
+        <label class="setting-label">表情分析</label>
+        <div class="segmented-control">
+          <input type="radio" id="face-analysis-on" name="face_analysis" value="on" checked>
+          <label for="face-analysis-on">オン</label>
+          <input type="radio" id="face-analysis-off" name="face_analysis" value="off">
+          <label for="face-analysis-off">オフ</label>
+        </div>
+      </div>
+  
+      <div class="setting-section">
+        <label for="silence-threshold-slider" class="setting-label">マイク感度調整</label>
+        <div class="slider-container">
+          <input type="range" id="silence-threshold-slider" min="0.005" max="1.0" step="0.020" value="0.02">
+          <span id="silence-threshold-value">0.020</span>
+        </div>
+      </div>
+  
+      <div class="setting-section">
+        <label for="pause-duration-slider" class="setting-label">無音検知時間 (秒)</label>
+        <div class="slider-container">
+          <input type="range" id="pause-duration-slider" min="2" max="10" step="1" value="5">
+          <span id="pause-duration-value">5</span>
+        </div>
+      </div>
     </div>
-  </div>
-
-  <div class="setting-section">
-    <label for="pause-duration-slider" class="setting-label">無音検知時間 (秒)</label>
-    <div class="slider-container">
-      <input type="range" id="pause-duration-slider" min="2" max="10" step="1" value="5">
-      <span id="pause-duration-value">5</span>
+  
+    <div class="action-buttons">
+      <button id="startButton">練習を開始</button>
+      <button id="stopButton">練習を終了</button>
     </div>
+
+    <hr style="margin: 24px 0 16px 0; border: 0; border-top: 1px solid var(--outline-color);">
+
+    <a href="#" id="view-history-link-logged-in" class="history-link">練習履歴を見る</a>
+    <button id="logout-button">ログアウト</button>
   </div>
 
-  <div class="action-buttons">
-    <button id="startButton">練習を開始</button>
-    <button id="stopButton">練習を終了</button>
-  </div>
-
+  <script src="./lib/firebase-app.js"></script>
+  <script src="./lib/firebase-auth.js"></script>
+  <script src="firebase-config.js"></script>
   <script src="popup.js"></script>
 </body>
 

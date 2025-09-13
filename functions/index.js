@@ -1,6 +1,11 @@
 // functions/index.js
 const functions = require('@google-cloud/functions-framework');
 const cors = require('cors')({origin: true});
+const admin = require('firebase-admin');
+
+// Firebase Admin SDKを初期化
+admin.initializeApp();
+const db = admin.firestore();
 
 // Google Cloudクライアントライブラリ
 const { SpeechClient } = require('@google-cloud/speech').v1; // `.v1` を追記
@@ -121,7 +126,6 @@ async function getGeminiVisionFeedback(text, image, mode, history, facialFeedbac
   const requestBody = {
     contents: [{ parts: [
       { text: prompt }
-      // ★★★ 修正点: imageが存在する場合のみ、inline_dataを追加 ★★★
     ]}],
     generationConfig: {
       responseMimeType: "application/json",
@@ -388,6 +392,25 @@ functions.http('coachApi', async (req, res) => {
     }
 
     const { type, mode, history, persona } = req.body;
+    let userId = null;
+
+    // --- 認証チェック ---
+    const needsAuth = ['summary-report', 'get-history', 'realtime-feedback'];
+    if (needsAuth.includes(type)) {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).send('Unauthorized: Missing or invalid Authorization header.');
+      }
+      const idToken = authHeader.split('Bearer ')[1];
+      try {
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        userId = decodedToken.uid;
+        console.log('Authenticated user:', userId);
+      } catch (error) {
+        console.error('Error verifying auth token:', error);
+        return res.status(403).send('Unauthorized: Invalid token.');
+      }
+    }
 
     if (type === 'realtime-feedback') {
       const { audioContent, imageContent, videoFrameContent, conversationSummary } = req.body;
@@ -408,7 +431,7 @@ functions.http('coachApi', async (req, res) => {
       });
 
     } else if (type === 'summary-report') {
-      const { analysisResults, conversationSummary, totalTime } = req.body; // ★ totalTime を受け取る
+      const { analysisResults, conversationSummary, totalTime } = req.body;
 
       const combinedResults = {
         fullTranscript: analysisResults.map(r => r.fullTranscript).join(' '),
@@ -426,10 +449,48 @@ functions.http('coachApi', async (req, res) => {
       const summaryResult = await getGeminiSummary(combinedResults, sentiment, mode, persona, conversationSummary);
 
       if (summaryResult.success) {
-        // ★ レスポンスに totalTime を追加
+        try {
+          const sessionData = {
+            userId: userId,
+            ...summaryResult.data,
+            totalTime: totalTime,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          };
+          const docRef = await db.collection('users').doc(userId).collection('sessions').add(sessionData);
+          console.log('Practice session saved to Firestore with ID:', docRef.id);
+        } catch (error) {
+          console.error('Error saving practice session to Firestore:', error);
+        }
+
         res.status(200).send({ ...summaryResult.data, totalTime: totalTime });
       } else {
         res.status(500).send({ error: "サマリーの生成に失敗しました。", details: summaryResult.error, rawDetails: summaryResult.details });
+      }
+    } else if (type === 'get-history') {
+      try {
+        const snapshot = await db.collection('users').doc(userId).collection('sessions')
+                                 .orderBy('createdAt', 'desc')
+                                 .limit(20)
+                                 .get();
+        
+        if (snapshot.empty) {
+          res.status(200).send([]);
+          return;
+        }
+
+        const history = [];
+        snapshot.forEach(doc => {
+          let data = doc.data();
+          if (data.createdAt && data.createdAt.toDate) {
+            data.createdAt = data.createdAt.toDate().toISOString();
+          }
+          history.push({ id: doc.id, ...data });
+        });
+
+        res.status(200).send(history);
+      } catch (error) {
+        console.error('Error getting practice history from Firestore:', error);
+        res.status(500).send({ error: 'Failed to retrieve practice history.' });
       }
     } else {
       res.status(400).send('Invalid request type');
@@ -440,12 +501,11 @@ functions.http('coachApi', async (req, res) => {
 // Speech-to-Text関数
 async function transcribeAudio(audioContent) {
   try {
-    // ★★★ 修正点: Base64デコード処理を追加 ★★★
     const audioBytes = Buffer.from(audioContent, 'base64');
 
     const request = {
       audio: {
-        content: audioBytes, // デコードしたデータを渡す
+        content: audioBytes,
       },
       config: {
         encoding: 'WEBM_OPUS',
