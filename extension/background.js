@@ -16,6 +16,7 @@ const CLOUD_FUNCTION_URL = 'https://coachapi-hruygwmczq-an.a.run.app';
 console.log('background.jsが読み込まれました');
 
 // --- グローバル変数 ---
+let currentUser = null;
 let helperWindowId = null;
 let isRecording = false;
 let targetTabId = null;
@@ -30,15 +31,24 @@ let sessionFeedbackHistory = [];
 let consecutiveFailures = 0;
 let timerInterval = null;
 let elapsedTimeInSeconds = 0;
-
 const pendingSummaries = {};
+
+
+// --- 認証状態の監視とブロードキャスト ---
+firebase.auth().onAuthStateChanged(user => {
+  currentUser = user;
+  chrome.runtime.sendMessage({
+    type: 'AUTH_STATE_CHANGED',
+    user: user ? { displayName: user.displayName, email: user.email } : null
+  });
+});
+
 
 // --- 認証ヘルパー関数 ---
 async function getAuthToken() {
-  const user = firebase.auth().currentUser;
-  if (user) {
+  if (currentUser) {
     try {
-      return await user.getIdToken(true);
+      return await currentUser.getIdToken(true);
     } catch (error) {
       console.error('IDトークンの取得に失敗しました:', error);
       return null;
@@ -82,21 +92,47 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'SUMMARY_DISPLAY_COMPLETE':
       chrome.action.setBadgeText({ text: '' });
       break;
+    case 'GET_AUTH_STATE':
+      const unsubscribe = firebase.auth().onAuthStateChanged(user => {
+        unsubscribe();
+        currentUser = user;
+        if (user) {
+          sendResponse({ 
+            loggedIn: true, 
+            user: { 
+              displayName: user.displayName, 
+              email: user.email 
+            } 
+          });
+        } else {
+          sendResponse({ loggedIn: false });
+        }
+      });
+      return true;
+    case 'SIGN_IN_WITH_TOKEN':
+      const credential = firebase.auth.GoogleAuthProvider.credential(request.idToken);
+      firebase.auth().signInWithCredential(credential)
+        .catch((error) => {
+          console.error("Firebaseへのログインに失敗しました (background):", error);
+        });
+      break;
   }
 
   switch (request.action) {
     case "start":
-      startRecording(request.mode, request.persona, request.feedbackMode, request.faceAnalysis);
+      // popup.jsから送られてくる正しいキー(lastMode, lastPersonaなど)を使用する
+      startRecording(request.lastMode, request.lastPersona, request.lastFeedbackMode, request.lastFaceAnalysis);
       sendResponse({ message: "練習を開始しました。" });
       break;
     case "stop":
       stopRecording(sendResponse);
-      return true; // 非同期レスポンスのためにtrueを返す
+      return true;
   }
   
   return false;
 });
 
+// (他の関数は変更なし)
 // --- メインロジック ---
 function startRecording(mode, persona, feedbackMode, faceAnalysis) {
   clearInterval(timerInterval);
@@ -143,6 +179,7 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis) {
 }
 
 function stopRecording(sendResponseCallback) {
+  console.log('[background.js] stopRecording called.'); // ログ1
   isRecording = false;
 
   chrome.action.setBadgeText({ text: '...' });
@@ -274,6 +311,7 @@ function captureVisibleTab() {
 }
 
 async function generateSummary(analysisResults, finalConversationSummary, totalTime, feedbackHistory, sendResponseCallback) {
+  console.log('[background.js] generateSummary called.'); // ログ2
   const summaryTab = await chrome.tabs.create({ url: 'summary.html', active: false });
 
   pendingSummaries[summaryTab.id] = {
@@ -310,6 +348,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         return;
       }
 
+      console.log('[background.js] Calling summary-report endpoint...'); // ログ3
       const response = await fetch(CLOUD_FUNCTION_URL, {
         method: 'POST',
         headers: { 
@@ -325,6 +364,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
           totalTime: job.totalTime
         })
       });
+      console.log('[background.js] summary-report endpoint response status:', response.status); // ログ4
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "サーバーから不明なエラー応答", details: response.statusText }));

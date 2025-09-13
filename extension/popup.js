@@ -23,32 +23,89 @@ document.addEventListener('DOMContentLoaded', function () {
   const accordionContent = document.querySelector('.accordion-content');
 
   // --- Firebaseの初期化 ---
-  // firebase-config.jsで定義されたfirebaseConfigを使用
   const app = firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
 
-  // --- 認証状態の監視とUI更新 ---
-  auth.onAuthStateChanged(user => {
+  // --- UI更新関数 ---
+  function updateUI(user) {
     loadingView.style.display = 'none';
     if (user) {
-      // --- ログイン時の処理 ---
       loggedInView.style.display = 'block';
       loggedOutView.style.display = 'none';
       userInfo.textContent = `${user.displayName || user.email} としてログイン中`;
-      loadSettings(); // ログインしたら設定を読み込む
+      loadSettings();
     } else {
-      // --- ログアウト時の処理 ---
       loggedInView.style.display = 'none';
       loggedOutView.style.display = 'block';
       userInfo.textContent = '';
+    }
+  }
+
+  // --- バックグラウンドからの通知を待ち受けるリスナー ---
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'AUTH_STATE_CHANGED') {
+      updateUI(request.user);
+    }
+  });
+
+  // --- ポップアップ起動時に現在の認証状態を問い合わせ ---
+  chrome.runtime.sendMessage({ type: 'GET_AUTH_STATE' }, (response) => {
+    if (chrome.runtime.lastError) {
+        console.error(chrome.runtime.lastError.message);
+        updateUI(null);
+        return;
+    }
+    if (response) {
+      updateUI(response.loggedIn ? response.user : null);
+    } else {
+      updateUI(null);
     }
   });
 
   // --- 認証関連のイベントリスナー ---
   loginButton.addEventListener('click', () => {
-    // TODO: 将来的にWebアプリの正式なURLに差し替える
-    const webAppUrl = `https://${firebaseConfig.authDomain.replace('.firebaseapp.com', '.web.app')}`;
-    chrome.tabs.create({ url: webAppUrl });
+    const manifest = chrome.runtime.getManifest();
+    const clientId = manifest.oauth2.client_id;
+    const scopes = manifest.oauth2.scopes.join(' ');
+    const redirectUri = `https://${chrome.runtime.id}.chromiumapp.org/`;
+
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.set('client_id', clientId);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'id_token');
+    authUrl.searchParams.set('scope', scopes);
+    authUrl.searchParams.set('nonce', Math.random().toString(36).substring(2));
+
+    chrome.identity.launchWebAuthFlow({
+      url: authUrl.href,
+      interactive: true
+    }, (responseUrl) => {
+      if (chrome.runtime.lastError || !responseUrl) {
+        console.error("認証に失敗しました:", chrome.runtime.lastError?.message || "レスポンスがありません");
+        return;
+      }
+
+      try {
+        const url = new URL(responseUrl);
+        const params = new URLSearchParams(url.hash.substring(1));
+        const idToken = params.get('id_token');
+
+        if (!idToken) {
+          console.error("IDトークンが見つかりません");
+          return;
+        }
+
+        const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
+        // Firebaseへのログイン処理はバックグラウンドに任せる
+        chrome.runtime.sendMessage({ type: 'SIGN_IN_WITH_TOKEN', idToken: idToken });
+        // auth.signInWithCredential(credential)
+        //   .catch((error) => {
+        //     console.error("Firebaseへのログインに失敗しました:", error);
+        //   });
+      } catch (error) {
+        console.error("トークンの処理中にエラーが発生しました:", error);
+      }
+    });
   });
 
   logoutButton.addEventListener('click', () => {
@@ -56,9 +113,8 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   const openHistoryPage = () => {
-    // TODO: 将来的にWebアプリの正式なURLに差し替える
-    const webAppUrl = `https://${firebaseConfig.authDomain.replace('.firebaseapp.com', '.web.app')}`;
-    chrome.tabs.create({ url: `${webAppUrl}/history` });
+    const webAppUrl = `https://${firebaseConfig.projectId}.web.app/history.html`;
+    chrome.tabs.create({ url: webAppUrl });
   };
   viewHistoryLinkLoggedIn.addEventListener('click', openHistoryPage);
   viewHistoryLinkLoggedOut.addEventListener('click', openHistoryPage);
@@ -155,11 +211,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     chrome.runtime.sendMessage({ action: "stop" }, (response) => {
       if (chrome.runtime.lastError) {
-        console.error(chrome.runtime.lastError.message);
+        console.error("停止処理中にエラー:", chrome.runtime.lastError.message);
+        // エラーが発生してもウィンドウは閉じる
+        window.close();
       } else {
-        console.log(response?.message);
+        console.log("バックグラウンドからの応答:", response?.message);
+        // 応答を受け取ってからウィンドウを閉じる
+        window.close();
       }
-      window.close();
     });
   });
 });

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン - Prezento AI Coach</title>
+  <!-- <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/4.8.1/firebase-ui-auth.css" /> -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="auth-container">
+    <h1>Prezento AI Coach</h1>
+    <p>Googleアカウントでログインしてください</p>
+    <button id="login-button">Googleでログイン</button>
+    <p class="auth-note">ログイン後、このページは自動的に閉じるか、履歴ページに移動します。<br>Chrome拡張機能のポップアップから再度操作してください。</p>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <!-- <script src="https://www.gstatic.com/firebasejs/ui/4.8.1/firebase-ui-auth.js"></script> -->
+  <script src="./firebase-config.js"></script> 
+  <script src="app.js"></script>
+</body>
+</html>

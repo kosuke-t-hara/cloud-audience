@@ -1,51 +1,47 @@
 {
   "manifest_version": 3,
   "name": "Prezento AI Coach",
-  "version": "1.0.0",
-  "description": "プレゼンの練習をAIがリアルタイムでサポートするChrome拡張機能です。",
-  "icons": {
-    "16": "images/icon16.png",
-    "48": "images/icon48.png",
-    "128": "images/icon128.png"
-  },
+  "version": "1.0",
+  "description": "あなたのプレゼンテーションや思考の壁打ちをAIがサポートします。",
   "permissions": [
+    "activeTab",
     "scripting",
-    "debugger",
-    "storage"
+    "storage",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://coachapi-hruygwmczq-an.a.run.app/"
   ],
   "action": {
+    "default_popup": "popup.html",
     "default_icon": {
       "16": "images/icon16.png",
       "48": "images/icon48.png",
       "128": "images/icon128.png"
-    },
-    "default_title": "Prezento AI Coach",
-    "default_popup": "popup.html"
+    }
   },
   "background": {
     "service_worker": "background.js"
   },
-
-  "host_permissions": [
-    "<all_urls>"
-  ],
-
   "commands": {
     "toggle_recording": {
       "suggested_key": {
-        "default": "Ctrl+Shift+S"
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
       },
-      "description": "練習の開始/停止を切り替える"
+      "description": "練習の開始/終了を切り替えます"
     }
   },
-
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+  "oauth2": {
+    "client_id": "819782463010-lj7b7i9jrdigdu792mq2bj01is3cmak4.apps.googleusercontent.com",
+    "scopes": [
+      "profile",
+      "email"
+    ]
   },
-  "web_accessible_resources": [
-    {
-      "resources": [ "vad-processor.js" ],
-      "matches": [ "<all_urls>" ]
-    }
-  ]
+  "icons": {
+    "16": "images/icon16.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  }
 }

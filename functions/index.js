@@ -357,17 +357,20 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
         }
 
         const finalSummary = {
-          scores: geminiResult.scores,
-          highlight: geminiResult.highlight,
-          advice: geminiResult.advice,
+          scores: geminiResult.scores || null,
+          highlight: geminiResult.highlight || null,
+          advice: geminiResult.advice || null,
           analysis: {
             speaking_rate: Math.round(combinedResults.speakingRate),
             long_pause_count: combinedResults.longPauseCount,
             filler_words_count: combinedResults.fillerWordCount
           },
-          totalScore: totalScore,
-          persona_comment: geminiResult.persona_comment,
-          questions: geminiResult.questions // ★ 追加
+          totalScore: totalScore || 0,
+          persona_comment: geminiResult.persona_comment || null,
+          questions: geminiResult.questions || null,
+          key_points: geminiResult.key_points || null,
+          new_ideas: geminiResult.new_ideas || null,
+          summary_text: geminiResult.summary_text || null
         };
         return { success: true, data: finalSummary };
       } catch (parseError) {
@@ -456,13 +459,19 @@ functions.http('coachApi', async (req, res) => {
             totalTime: totalTime,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
           };
+          
+          // 【診断】書き込む直前のデータをログに出力
+          console.log("Attempting to save to Firestore:", JSON.stringify(sessionData, null, 2));
+
           const docRef = await db.collection('users').doc(userId).collection('sessions').add(sessionData);
           console.log('Practice session saved to Firestore with ID:', docRef.id);
+          
+          res.status(200).send({ ...summaryResult.data, totalTime: totalTime });
+
         } catch (error) {
           console.error('Error saving practice session to Firestore:', error);
+          res.status(500).send({ error: "データベースへのセッション保存に失敗しました。", details: error.message });
         }
-
-        res.status(200).send({ ...summaryResult.data, totalTime: totalTime });
       } else {
         res.status(500).send({ error: "サマリーの生成に失敗しました。", details: summaryResult.error, rawDetails: summaryResult.details });
       }
