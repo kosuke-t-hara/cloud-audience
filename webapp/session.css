@@ -1,0 +1,127 @@
+/* session.css */
+
+.session-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+}
+
+.back-to-dashboard {
+    display: inline-block;
+    margin-bottom: 2rem;
+    color: #007bff;
+    text-decoration: none;
+}
+.back-to-dashboard:hover {
+    text-decoration: underline;
+}
+
+.session-container section {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.session-container h2 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+}
+
+/* レポートサマリー */
+.report-summary .summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+.report-summary .summary-header p {
+    font-size: 1.1rem;
+    color: #666;
+}
+
+.summary-score-container {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    align-items: center;
+    gap: 2rem;
+}
+
+.summary-score-container .score-display {
+    text-align: center;
+}
+.summary-score-container .score-display p {
+    margin: 0;
+    font-size: 1.2rem;
+}
+.summary-score-container .score-display #session-total-score {
+    font-size: 5rem;
+    font-weight: bold;
+    color: #007bff;
+    line-height: 1;
+}
+.summary-score-container .score-display .max-score {
+    font-size: 1.2rem;
+    color: #666;
+}
+
+.summary-score-container .chart-container {
+    max-height: 300px;
+}
+
+/* 詳細フィードバック */
+.detailed-feedback .feedback-item {
+    margin-bottom: 2rem;
+}
+.detailed-feedback .feedback-item:last-child {
+    margin-bottom: 0;
+}
+.detailed-feedback h3 {
+    font-size: 1.2rem;
+    color: #007bff;
+    margin-bottom: 0.5rem;
+}
+.detailed-feedback p,
+.detailed-feedback blockquote {
+    margin: 0;
+    line-height: 1.7;
+    color: #333;
+}
+.detailed-feedback blockquote {
+    border-left: 4px solid #eee;
+    padding-left: 1rem;
+    font-style: italic;
+    color: #555;
+}
+
+/* AIからの質問 */
+.ai-questions ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.ai-questions li {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 5px;
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+.ai-questions li:last-child {
+    margin-bottom: 0;
+}
+
+/* 文字起こし */
+.transcript #transcript-text {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 5px;
+    line-height: 1.8;
+    max-height: 400px;
+    overflow-y: auto;
+}

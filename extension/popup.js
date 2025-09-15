@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   const openHistoryPage = () => {
-    const webAppUrl = `https://${firebaseConfig.projectId}.web.app/history.html`;
+    const webAppUrl = `https://${firebaseConfig.projectId}.web.app/dashboard.html`;
     chrome.tabs.create({ url: webAppUrl });
   };
   viewHistoryLinkLoggedIn.addEventListener('click', openHistoryPage);

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>練習レポート | Prezento AI Coach</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="session.css"> <!-- session.css に変更 -->
+</head>
+<body>
+    <header>
+        <h1>Prezento AI Coach</h1>
+        <nav>
+            <a href="index.html">ホーム</a>
+            <a href="dashboard.html">ダッシュボード</a>
+            <button id="logout-button">ログアウト</button>
+        </nav>
+    </header>
+
+    <main class="session-container">
+        <a href="dashboard.html" class="back-to-dashboard">&larr; ダッシュボードに戻る</a>
+        
+        <section class="report-summary">
+            <div class="summary-header">
+                <h2>練習レポート</h2>
+                <p id="session-date">----/--/--</p>
+            </div>
+            <div class="summary-score-container">
+                <div class="score-display">
+                    <p>Total Score</p>
+                    <span id="session-total-score">--</span>
+                    <span class="max-score">/ 500</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="score-radar-chart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="detailed-feedback">
+            <h2>フィードバック</h2>
+            <div class="feedback-item">
+                <h3>ハイライト</h3>
+                <p id="feedback-highlight">読み込んでいます...</p>
+            </div>
+            <div class="feedback-item">
+                <h3>改善点</h3>
+                <p id="feedback-advice">読み込んでいます...</p>
+            </div>
+            <div class="feedback-item">
+                <h3>ペルソナからのコメント</h3>
+                <blockquote id="feedback-persona">読み込んでいます...</blockquote>
+            </div>
+        </section>
+
+        <section class="ai-questions">
+            <h2>AIからの質問リスト</h2>
+            <ul id="ai-questions-list">
+                <li>質問を読み込んでいます...</li>
+            </ul>
+        </section>
+
+        <section class="transcript">
+            <h2>文字起こし</h2>
+            <div id="transcript-text">
+                <p>文字起こしデータを読み込んでいます...</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Firebase -->
+    <script src="lib/firebase-app.js"></script>
+    <script src="lib/firebase-auth.js"></script>
+    <script src="lib/firebase-firestore.js"></script>
+    <script src="firebase-config.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- App Logic -->
+    <script src="app.js"></script>
+    <script src="session.js"></script> <!-- session.js に変更 -->
+</body>
+</html>

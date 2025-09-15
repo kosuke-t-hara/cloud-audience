@@ -141,7 +141,9 @@ vite.config.ts.timestamp-*
 # special files
 spec
 GEMINI.md
-.gemini
+.gemini/02*
+.gemini/05*
+.gemini/10*
 extension.zip
 
 # functions/service-account-key.json
