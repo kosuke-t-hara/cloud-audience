@@ -54,7 +54,6 @@ async function loadAndRenderData(userId) {
         }));
 
         if (sessions.length > 0) {
-            renderAnalytics(sessions[0]);
             renderPerformanceSummary(sessions); // ★ 新しいサマリー表示関数
             renderScoreChart(sessions);
             renderActivityList(sessions);
@@ -69,19 +68,7 @@ async function loadAndRenderData(userId) {
     }
 }
 
-function renderAnalytics(latestSession) {
-    const totalScore = calculateTotalScore(latestSession.scores);
-    document.getElementById('latest-score').textContent = totalScore;
-    // 500点満点に変更
-    document.querySelector('.score-display span').textContent = '/ 500';
-    document.getElementById('score-feedback').textContent = latestSession.highlight || 'フィードバックはありません。';
 
-    document.getElementById('metric-clarity').textContent = latestSession.scores?.clarity || '--';
-    document.getElementById('metric-passion').textContent = latestSession.scores?.passion || '--';
-    document.getElementById('metric-insightfulness').textContent = latestSession.scores?.insightfulness || '--';
-    document.getElementById('metric-structure').textContent = latestSession.scores?.structure || '--';
-    document.getElementById('metric-confidence').textContent = latestSession.scores?.confidence || '--';
-}
 
 /**
  * ★ パフォーマンスサマリー（最高・最低・平均）を描画する
