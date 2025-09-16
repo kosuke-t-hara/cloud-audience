@@ -1,5 +1,16 @@
 /* session.css */
 
+/* ヘッダーのスタイル */
+header nav {
+    display: flex;
+    align-items: center;
+}
+
+.user-name-display {
+    margin-right: 1.5rem;
+    font-weight: 500;
+}
+
 .session-container {
     max-width: 900px;
     margin: 2rem auto;

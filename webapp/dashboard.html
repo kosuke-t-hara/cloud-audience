@@ -11,8 +11,7 @@
     <header>
         <h1>Prezento AI Coach</h1>
         <nav>
-            <a href="index.html">ホーム</a>
-            <a href="dashboard.html" class="active">ダッシュボード</a>
+            <span id="user-name" class="user-name-display"></span>
             <button id="logout-button">ログアウト</button>
         </nav>
     </header>
@@ -26,7 +25,6 @@
         <!-- 分析タブのコンテンツ -->
         <div id="analytics" class="tab-content active">
             <section class="performance-summary-section">
-                <h2>パフォーマンスサマリー (直近100件)</h2>
                 <div class="stats-grid">
                     <div class="stat-card">
                         <h3>最高得点</h3>
@@ -54,7 +52,6 @@
         <!-- アクティビティタブのコンテンツ -->
         <div id="activity" class="tab-content">
             <div id="activity-list-container">
-                <!-- JavaScriptによってアクティビティがここに挿入されます -->
                 <p>アクティビティを読み込んでいます...</p>
             </div>
         </div>

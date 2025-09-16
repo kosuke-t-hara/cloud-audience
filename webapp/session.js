@@ -3,6 +3,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     firebase.auth().onAuthStateChanged(user => {
         if (user) {
+            // ユーザー名の表示
+            const userNameElement = document.getElementById('user-name');
+            if (userNameElement) {
+                userNameElement.textContent = user.displayName || user.email;
+            }
             loadSessionData(user);
         } else {
             window.location.href = 'index.html';

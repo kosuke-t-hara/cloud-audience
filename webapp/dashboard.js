@@ -3,6 +3,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     firebase.auth().onAuthStateChanged(user => {
         if (user) {
+            // ユーザー名の表示
+            const userNameElement = document.getElementById('user-name');
+            if (userNameElement) {
+                userNameElement.textContent = user.displayName || user.email;
+            }
             initializeDashboard(user);
         } else {
             window.location.href = 'index.html';
@@ -16,7 +21,6 @@ function initializeDashboard(user) {
 }
 
 function setupTabs() {
-    // (変更なし)
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
     tabLinks.forEach(link => {
@@ -54,7 +58,7 @@ async function loadAndRenderData(userId) {
         }));
 
         if (sessions.length > 0) {
-            renderPerformanceSummary(sessions); // ★ 新しいサマリー表示関数
+            renderPerformanceSummary(sessions);
             renderScoreChart(sessions);
             renderActivityList(sessions);
         } else {
@@ -68,10 +72,8 @@ async function loadAndRenderData(userId) {
     }
 }
 
-
-
 /**
- * ★ パフォーマンスサマリー（最高・最低・平均）を描画する
+ * パフォーマンスサマリー（最高・最低・平均）を描画する
  * @param {Array<object>} sessions
  */
 function renderPerformanceSummary(sessions) {
@@ -87,14 +89,17 @@ function renderPerformanceSummary(sessions) {
 }
 
 /**
- * ★ 積み上げエリアチャートを描画する
+ * 積み上げエリアチャートを描画する
  * @param {Array<object>} sessions
  */
 function renderScoreChart(sessions) {
     const ctx = document.getElementById('score-chart').getContext('2d');
     
     const reversedSessions = [...sessions].reverse();
-    const labels = reversedSessions.map(s => s.createdAt.toDate().toLocaleDateString('ja-JP'));
+    const labels = reversedSessions.map(s => {
+        const date = s.createdAt.toDate();
+        return `${date.getMonth() + 1}月${date.getDate()}日`;
+    });
 
     const scoreKeys = ['clarity', 'passion', 'insightfulness', 'structure', 'confidence'];
     const scoreLabels = {
@@ -105,18 +110,18 @@ function renderScoreChart(sessions) {
         confidence: '自信'
     };
     const colors = {
-        clarity: 'rgba(54, 162, 235, 0.5)',
-        passion: 'rgba(255, 99, 132, 0.5)',
-        insightfulness: 'rgba(255, 206, 86, 0.5)',
-        structure: 'rgba(75, 192, 192, 0.5)',
-        confidence: 'rgba(153, 102, 255, 0.5)'
+        clarity: 'rgba(128, 90, 213, 0.6)',
+        passion: 'rgba(159, 122, 234, 0.6)',
+        insightfulness: 'rgba(196, 181, 253, 0.6)',
+        structure: 'rgba(221, 214, 254, 0.6)',
+        confidence: 'rgba(237, 233, 254, 0.8)'
     };
 
     const datasets = scoreKeys.map(key => ({
         label: scoreLabels[key],
         data: reversedSessions.map(s => s.scores?.[key] || 0),
         backgroundColor: colors[key],
-        borderColor: 'rgba(255,255,255,0.5)',
+        borderColor: 'rgba(128, 90, 213, 0.8)',
         borderWidth: 1,
         fill: true,
     }));
@@ -132,8 +137,9 @@ function renderScoreChart(sessions) {
             maintainAspectRatio: false,
             scales: {
                 y: {
-                    stacked: true, // 積み上げ
-                    max: 500 // Y軸の最大値
+                    stacked: true,
+                    max: 500,
+                    title: { display: true, text: '総合得点' }
                 },
                 x: {
                     stacked: true
@@ -156,23 +162,38 @@ function renderScoreChart(sessions) {
 
 function renderActivityList(sessions) {
     const container = document.getElementById('activity-list-container');
-    container.innerHTML = '';
+    container.innerHTML = ''; // Clear previous content
+
+    if (sessions.length === 0) {
+        container.innerHTML = '<p>練習履歴はありません。</p>';
+        return;
+    }
 
     sessions.forEach(session => {
         const card = document.createElement('div');
         card.className = 'activity-card';
         
+        const personaName = session.persona || 'AI Coach';
+        const personaComment = session.persona_comment || 'このセッションに関するコメントはありません。';
         const sessionDate = session.createdAt.toDate();
-        const duration = session.duration || '記録なし';
-        const totalScore = calculateTotalScore(session.scores);
+
+        const truncatedName = personaName.length > 20 ? personaName.substring(0, 20) + '...' : personaName;
+        const truncatedComment = personaComment.length > 140 ? personaComment.substring(0, 140) + '...' : personaComment;
+        const timeAgo = formatTimeAgo(sessionDate);
+        const fullDate = sessionDate.toLocaleString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        
+        const nameInitials = personaName.substring(0, 1);
 
         card.innerHTML = `
-            <div class="info">
-                <h3>${sessionDate.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}</h3>
-                <p>練習時間: ${duration}</p>
+            <div class="activity-card-icon">
+                <span>${nameInitials}</span>
             </div>
-            <div class="score">
-                <span>${totalScore}</span>
+            <div class="activity-card-content">
+                <div class="activity-card-header">
+                    <span class="activity-card-username">${truncatedName}</span>
+                    <span class="activity-card-time" data-tooltip="${fullDate}">${timeAgo}</span>
+                </div>
+                <p class="activity-card-comment">${truncatedComment}</p>
             </div>
         `;
 
@@ -182,4 +203,23 @@ function renderActivityList(sessions) {
 
         container.appendChild(card);
     });
+}
+
+function formatTimeAgo(date) {
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+
+    let interval = seconds / 86400;
+    if (interval > 1) {
+        return Math.floor(interval) + "日前";
+    }
+    interval = seconds / 3600;
+    if (interval > 1) {
+        return Math.floor(interval) + "時間前";
+    }
+    interval = seconds / 60;
+    if (interval > 1) {
+        return Math.floor(interval) + "分前";
+    }
+    return Math.floor(seconds) + "秒前";
 }
