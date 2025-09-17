@@ -145,6 +145,8 @@ GEMINI.md
 .gemini/05*
 .gemini/10*
 extension.zip
+key.pem
+extension.crx
 
 # functions/service-account-key.json
 functions/service-account-key.json

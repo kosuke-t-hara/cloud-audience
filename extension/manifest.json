@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Prezento AI Coach",
   "version": "1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1n0zDdun/raq5OTATrYaR8cTHMPFgjSpQGRFtuvOiOFooXyfYF6kJ84ohZsfQWpJtg+qx5AHtQ+pZGeUZICdqJ7D6Rt/7KmzDQnjeVYHHls4yHrk1fOrLRQpyJLmB53DWhhIj+ypfIzTEa2je1LhOGU398mCaG1v3P+fuQ7pWuRvxfH8nYQNdFcWmBJ1Y33PYmzpSCf8Q/JV/WV8D/ZinFZX7BRP0aEWOTPn/UG+9cjAQGFh8W7MLsIpNMXCVdd5jTb4CZIqjx7qcN3sxa81xCIeGs9H5lW4Dt+PJGNltAeQf53bVT8zkEG8nph+g4D298QdZ1gRPGrc9kXBk2u6IwIDAQAB",
   "description": "あなたのプレゼンテーションや思考の壁打ちをAIがサポートします。",
   "permissions": [
     "activeTab",
