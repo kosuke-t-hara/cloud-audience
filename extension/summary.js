@@ -1,6 +1,70 @@
-// サマリーページの準備ができたことをバックグラウンドに通知
-chrome.runtime.sendMessage({ type: 'SUMMARY_PAGE_READY' });
+// --- ローディングメッセージ関連 ---
+const loadingMessages = [
+  // オリジナル
+  "魔法の呪文を唱えています... ✨",
+  "AIが腕まくりをしました...",
+  "思考の海に深く潜っています...",
+  "あなたの言葉からダイヤモンドの原石を発掘中...",
+  "最高のフィードバックをコンパイル中 (バグが出ませんように)",
+  "拍手喝采の瞬間をシミュレーションしています...",
+  "宇宙の真理とあなたのスピーチを照合中...",
+  "もう少しです...たぶん！",
+  // 追加分
+  "フィードバックを最適化中... O(log n)で終わらせたい。",
+  "ニューラルネットワークにコーヒーを淹れています...",
+  "1と0を並べ替えて、素晴らしい洞察を作成中。",
+  "あなたのスピーチを分析中。それはバグじゃなくて、特徴です。",
+  "ピクセルを磨いています... レポートが輝くように。",
+  "アルゴリズムに「喝」を入れています。",
+  "シリコンの筋肉をストレッチ中...",
+  "あなたの言葉の裏にある宇宙の意図を解読中...",
+  "存在意義について少し考えていました。さて、レポート作成に戻ります。",
+  "アイデアの星座を結んでいます...",
+  "分析のポーションを調合中... 秘密の材料をひとつまみ。",
+  "洞察の巻物を読み解いています...",
+  "あなたの言葉にエンチャントをかけています...",
+  "ちょっと休憩... AIだって一息つきたい。",
+  "インスピレーションが湧くのを待っています... 待ちぼうけ。",
+  "最高の言葉を選ぶために、辞書と格闘中。",
+  "あなたの話術から「いいね！」を探しています。",
+  "フィードバックを金箔で飾り付け中...",
+  "改善点を分かりやすく翻訳しています...",
+  "自分自身とブレインストーミング中です。なかなか良いアイデアが出ます。"
+];
+let messageInterval = null;
 
+function startLoadingAnimation() {
+  const messageElement = document.getElementById('loading-message');
+  let lastMessageIndex = -1; // 直前に表示したメッセージのインデックスを保持
+
+  messageInterval = setInterval(() => {
+    let newMessageIndex;
+    // 同じメッセージが連続しないように、新しいインデックスを生成する
+    do {
+      newMessageIndex = Math.floor(Math.random() * loadingMessages.length);
+    } while (loadingMessages.length > 1 && newMessageIndex === lastMessageIndex);
+    
+    messageElement.textContent = loadingMessages[newMessageIndex];
+    lastMessageIndex = newMessageIndex;
+  }, 3000); // 3秒ごとにメッセージを切り替え
+}
+
+function stopLoadingAnimation() {
+  if (messageInterval) {
+    clearInterval(messageInterval);
+    messageInterval = null;
+  }
+}
+
+// --- 初期化処理 ---
+document.addEventListener('DOMContentLoaded', () => {
+  startLoadingAnimation();
+  // サマリーページの準備ができたことをバックグラウンドに通知
+  chrome.runtime.sendMessage({ type: 'SUMMARY_PAGE_READY' });
+});
+
+
+// --- チャート関連 ---
 let radarChart = null; // チャートインスタンスを保持する変数
 
 // ページが閉じられるときにチャートを破棄
@@ -12,14 +76,17 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
+
+// --- メッセージリスナー ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  const loader = document.getElementById('loader');
+  const loadingContainer = document.getElementById('loading-container');
   const errorContainer = document.getElementById('error-container');
   const summaryContent = document.getElementById('summary-content');
 
   if (request.type === 'show_summary') {
+    stopLoadingAnimation();
     // ローディングを非表示にし、サマリーを表示
-    loader.style.display = 'none';
+    loadingContainer.style.display = 'none';
     summaryContent.style.display = 'block';
 
     const mode = request.mode;
@@ -171,8 +238,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
   } else if (request.type === 'show_summary_error') {
+    stopLoadingAnimation();
     // ローディングを非表示にし、エラーを表示
-    loader.style.display = 'none';
+    loadingContainer.style.display = 'none';
     errorContainer.style.display = 'block';
     
     let errorMessage = `<h2>サマリーの生成に失敗しました</h2><p>${request.error}</p>`;

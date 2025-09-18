@@ -111,11 +111,7 @@
       width: 120px;
       height: 120px;
       animation: spin 2s linear infinite;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      margin-top: -60px;
-      margin-left: -60px;
+      margin: 0 auto; /* コンテナ内で中央に配置 */
     }
 
     @keyframes spin {
@@ -146,11 +142,28 @@
       text-decoration: none;
       font-weight: bold;
       transition: background-color 0.3s;
+      font-size: 15px; /* 「履歴を開く」ボタンとサイズを合わせる */
     }
 
     .dashboard-link:hover {
       background-color: #553C9A; /* Darker Purple */
     }
+
+    /* --- ローディング関連のスタイル --- */
+    #loading-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      width: 500px; /* 横幅を固定 */
+    }
+    #loading-message {
+      margin-top: 30px; /* スピナーからの距離を調整 */
+      font-size: 1.2em;
+      color: #5f6368;
+    }
+
   </style>
   <script src="./lib/chart.umd.js"></script>
 </head>
@@ -158,7 +171,10 @@
 <body>
   <h1>サマリーレポート</h1>
 
-  <div id="loader"></div>
+  <div id="loading-container">
+    <div id="loader"></div>
+    <p id="loading-message">レポートの生成を準備しています...</p>
+  </div>
   <div id="error-container" class="error-message" style="display: none;"></div>
 
   <div id="summary-content" style="display: none;">

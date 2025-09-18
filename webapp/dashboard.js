@@ -105,7 +105,7 @@ function renderScoreChart(sessions) {
     const scoreLabels = {
         clarity: '明瞭さ',
         passion: '情熱',
-        insightfulness: '洞察力',
+        insightfulness: '示唆',
         structure: '構成力',
         confidence: '自信'
     };
