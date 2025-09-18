@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // --- ペルソナ入力欄の表示/非表示ロジック ---
   function togglePersonaInput() {
     const selectedMode = document.querySelector('input[name="mode"]:checked').value;
-    personaInputSection.style.display = (selectedMode === 'presenter' || selectedMode === 'creator') ? 'block' : 'none';
+    personaInputSection.style.display = (selectedMode === 'presenter' || selectedMode === 'thinking') ? 'block' : 'none';
   }
 
   modeRadios.forEach(radio => {
@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const settings = {
       lastLanguage: document.querySelector('input[name="language"]:checked').value,
       lastMode: document.querySelector('input[name="mode"]:checked').value,
-      lastPersona: (document.querySelector('input[name="mode"]:checked').value === 'presenter' || document.querySelector('input[name="mode"]:checked').value === 'creator') ? personaText.value : null,
+      lastPersona: (document.querySelector('input[name="mode"]:checked').value === 'presenter' || document.querySelector('input[name="mode"]:checked').value === 'thinking') ? personaText.value : null,
       lastFeedbackMode: document.querySelector('input[name="feedback_mode"]:checked').value,
       lastFaceAnalysis: document.querySelector('input[name="face_analysis"]:checked').value,
       silenceThreshold: parseFloat(thresholdSlider.value),

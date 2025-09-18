@@ -169,29 +169,43 @@ function renderActivityList(sessions) {
         return;
     }
 
+    // アイコンSVGの定義
+    const icons = {
+        presenter: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>',
+        thinking: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>',
+        default: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM8.5 12.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3.5 4c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zm3.5-4c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>'
+    };
+
     sessions.forEach(session => {
         const card = document.createElement('div');
         card.className = 'activity-card';
         
-        const personaName = session.persona || 'AI Coach';
+        const displayName = session.persona ? session.persona : 'AI Coach';
         const personaComment = session.persona_comment || 'このセッションに関するコメントはありません。';
         const sessionDate = session.createdAt.toDate();
+        const sessionMode = session.mode || 'default';
 
-        const truncatedName = personaName.length > 20 ? personaName.substring(0, 20) + '...' : personaName;
+        const iconSvg = icons[sessionMode] || icons.default;
+        
+        // 新仕様: 合計スコアの計算
+        const totalScore = calculateTotalScore(session.scores);
+
+        const truncatedName = displayName.length > 15 ? displayName.substring(0, 15) + '...' : displayName;
         const truncatedComment = personaComment.length > 140 ? personaComment.substring(0, 140) + '...' : personaComment;
         const timeAgo = formatTimeAgo(sessionDate);
         const fullDate = sessionDate.toLocaleString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         
-        const nameInitials = personaName.substring(0, 1);
-
         card.innerHTML = `
             <div class="activity-card-icon">
-                <span>${nameInitials}</span>
+                ${iconSvg}
             </div>
             <div class="activity-card-content">
                 <div class="activity-card-header">
-                    <span class="activity-card-username">${truncatedName}</span>
-                    <span class="activity-card-time" data-tooltip="${fullDate}">${timeAgo}</span>
+                    <span class="activity-card-username" title="${displayName}">${truncatedName}</span>
+                    <div class="activity-card-meta">
+                        <span class="activity-card-score">${totalScore}</span>
+                        <span class="activity-card-time" data-tooltip="${fullDate}">${timeAgo}</span>
+                    </div>
                 </div>
                 <p class="activity-card-comment">${truncatedComment}</p>
             </div>

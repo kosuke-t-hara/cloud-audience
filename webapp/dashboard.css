@@ -191,9 +191,21 @@ header nav .button-link:hover {
     font-size: 1rem;
 }
 
-.activity-card-time {
-    font-size: 0.85rem;
+.activity-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem; /* 12px */
     color: var(--text-color-secondary);
+    font-size: 0.85rem;
+}
+
+.activity-card-score {
+    font-weight: 700; /* 太字に変更 */
+    color: var(--primary-color);
+    font-size: 1rem; /* 少し大きく */
+}
+
+.activity-card-time {
     position: relative; /* ツールチップの位置の基準 */
 }
 

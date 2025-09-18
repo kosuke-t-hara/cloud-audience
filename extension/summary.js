@@ -1,3 +1,6 @@
+// サマリーページの準備ができたことをバックグラウンドに通知
+chrome.runtime.sendMessage({ type: 'SUMMARY_PAGE_READY' });
+
 let radarChart = null; // チャートインスタンスを保持する変数
 
 // ページが閉じられるときにチャートを破棄

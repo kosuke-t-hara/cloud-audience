@@ -75,6 +75,14 @@ function renderSessionDetails(data) {
     document.getElementById('transcript-text').innerHTML = transcriptText;
 
 
+    // ペルソナ設定の表示
+    const personaContainer = document.getElementById('session-persona-container');
+    const personaSpan = document.getElementById('session-persona');
+    if (data.persona && data.persona.trim() !== '') {
+        personaSpan.textContent = data.persona;
+        personaContainer.style.display = 'flex'; // flexに変更して中央揃えに対応
+    }
+
     // レーダーチャートを描画
     renderRadarChart(data.scores);
 }

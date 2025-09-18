@@ -171,64 +171,7 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
 
   let prompt;
   switch (mode) {
-    case 'creator':
-      let creatorPersonaPromptPart = '敏腕YouTubeプロデューサー';
-      if (persona && persona.trim() !== '') {
-        creatorPersonaPromptPart = persona.trim();
-      }
-      prompt = `
-        あなたは${creatorPersonaPromptPart}です。
-        以下の「分析データ」「リアルタイム対話の要約」「文字起こしデータ」を総合的に分析し、評価を出力してください。
-
-        # ルール
-        - 全てのキーと文字列の値は、必ずダブルクォーテーション("")で囲んでください。
-        - 評価値は1から100の整数で表現してください。
-        - highlight: 最も良かった点を含めて800字以内で記述
-        - advice: 改善点を800字以内で記述
-        - 最後に、あなたは「${creatorPersonaPromptPart}」の役割に完全になりきり、発話全体への総評を persona_comment として800字以内で記述してください。
-        - さらに、この動画の視聴者として、内容を深掘りするための鋭い質問を3つ生成し、'questions'キーに配列として含めてください。
-        - 必ず「出力形式」のJSON形式にのみ従ってください。
-
-        # 分析データ
-        - 平均話速: ${Math.round(combinedResults.speakingRate)} 文字/分
-        - 2秒以上の間の回数: ${combinedResults.longPauseCount} 回
-        - フィラーワードの回数: ${combinedResults.fillerWordCount} 回
-        - 感情分析スコア: ${JSON.stringify(sentiment)}
-
-        # リアルタイム対話の要約
-        ${conversationSummary || 'リアルタイムの対話はありませんでした。'}
-
-        # 評価基準
-        - 上記の「分析データ」を最重要の客観的指標として扱い、評価スコアを決定してください。
-        - フックの強さ: 視聴者を惹きつける要素があるか。
-        - エンタメ性: 面白さや盛り上がりがあるか。
-        - ペーシング: 話のテンポや間の使い方。
-        - キラーフレーズ: 印象的な言葉やフレーズがあるか。
-        - 安全性リスク: 不適切な表現や炎上リスクがないか。
-
-        # 出力形式 (JSON)
-        {
-          "scores": {
-            "hook_strength": <number>,
-            "entertainment": <number>,
-            "pacing": <number>,
-            "killer_phrase": <number>,
-            "safety_risk": <number>
-          },
-          "highlight": "<string>",
-          "advice": "<string>",
-          "persona_comment": "<string>",
-          "questions": [
-            "<string: 質問1>",
-            "<string: 質問2>",
-            "<string: 質問3>"
-          ]
-        }
-
-        # 文字起こしデータ
-        ${combinedResults.fullTranscript}
-      `;
-      break;
+    
     case 'thinking':
       let thinkingPersonaPromptPart = '優秀な壁打ち相手';
       if (persona && persona.trim() !== '') {
@@ -452,7 +395,7 @@ functions.http('coachApi', async (req, res) => {
     });
 
   } else if (type === 'summary-report') {
-    const { analysisResults, conversationSummary, totalTime } = req.body;
+    const { analysisResults, conversationSummary, totalTime, mode, persona } = req.body;
 
     const combinedResults = {
       fullTranscript: analysisResults.map(r => r.fullTranscript).join(' '),
@@ -473,6 +416,8 @@ functions.http('coachApi', async (req, res) => {
         try {
           const sessionData = {
             userId: userId,
+            mode: mode,
+            persona: persona,
             ...summaryResult.data,
             totalTime: totalTime,
             createdAt: admin.firestore.FieldValue.serverTimestamp()

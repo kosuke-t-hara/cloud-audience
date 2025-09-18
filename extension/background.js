@@ -78,23 +78,28 @@ chrome.windows.onRemoved.addListener((windowId) => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  switch (request.type) {
-    case 'video_frame':
-      latestVideoFrame = request.data;
-      break;
-    case 'audio_chunk':
-      handleAudioChunk(request.data);
-      break;
-    case 'mic_error':
-      console.error("ヘルパーウィンドウでエラー:", request.error);
-      stopRecording();
-      break;
-    case 'SUMMARY_DISPLAY_COMPLETE':
-      chrome.action.setBadgeText({ text: '' });
-      break;
-    case 'GET_AUTH_STATE':
-      const unsubscribe = firebase.auth().onAuthStateChanged(user => {
-        unsubscribe();
+  (async () => {
+    switch (request.type) {
+      case 'video_frame':
+        latestVideoFrame = request.data;
+        break;
+      case 'audio_chunk':
+        await handleAudioChunk(request.data);
+        break;
+      case 'mic_error':
+        console.error("ヘルパーウィンドウでエラー:", request.error);
+        stopRecording();
+        break;
+      case 'SUMMARY_DISPLAY_COMPLETE':
+        chrome.action.setBadgeText({ text: '' });
+        break;
+      case 'GET_AUTH_STATE':
+        const user = await new Promise(resolve => {
+          const unsubscribe = firebase.auth().onAuthStateChanged(user => {
+            unsubscribe();
+            resolve(user);
+          });
+        });
         currentUser = user;
         if (user) {
           sendResponse({ 
@@ -107,29 +112,88 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         } else {
           sendResponse({ loggedIn: false });
         }
-      });
-      return true;
-    case 'SIGN_IN_WITH_TOKEN':
-      const credential = firebase.auth.GoogleAuthProvider.credential(request.idToken);
-      firebase.auth().signInWithCredential(credential)
-        .catch((error) => {
-          console.error("Firebaseへのログインに失敗しました (background):", error);
-        });
-      break;
-  }
+        break;
+      case 'SIGN_IN_WITH_TOKEN':
+        const credential = firebase.auth.GoogleAuthProvider.credential(request.idToken);
+        firebase.auth().signInWithCredential(credential)
+          .catch((error) => {
+            console.error("Firebaseへのログインに失敗しました (background):", error);
+          });
+        break;
+      case 'SUMMARY_PAGE_READY':
+        const tabId = sender.tab.id;
+        const job = pendingSummaries[tabId];
+        if (!job) {
+          console.warn(`SUMMARY_PAGE_READY を受け取りましたが、tabId: ${tabId} の保留中ジョブが見つかりません。`);
+          return;
+        }
+        delete pendingSummaries[tabId];
 
-  switch (request.action) {
-    case "start":
-      // popup.jsから送られてくる正しいキー(lastMode, lastPersonaなど)を使用する
-      startRecording(request.lastMode, request.lastPersona, request.lastFeedbackMode, request.lastFaceAnalysis);
-      sendResponse({ message: "練習を開始しました。" });
-      break;
-    case "stop":
-      stopRecording(sendResponse);
-      return true;
-  }
+        try {
+          if (job.analysisResults.length === 0) {
+            chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: '十分な分析データがありませんでした。' });
+            return;
+          }
+
+          const idToken = await getAuthToken();
+          if (!idToken) {
+            chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: 'ログインしていません。サマリーを生成できませんでした。' });
+            return;
+          }
+
+          const response = await fetch(CLOUD_FUNCTION_URL, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+              type: 'summary-report',
+              analysisResults: job.analysisResults,
+              mode: job.mode,
+              persona: job.persona,
+              conversationSummary: job.finalConversationSummary,
+              totalTime: job.totalTime
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: "サーバーから不明なエラー応答", details: response.statusText }));
+            chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: errorData.error, details: errorData.details });
+            return;
+          }
+
+          const summaryData = await response.json();
+          
+          chrome.tabs.sendMessage(tabId, {
+            type: 'show_summary',
+            data: { ...summaryData, feedbackHistory: job.feedbackHistory },
+            mode: job.mode
+          });
+
+        } catch (error) {
+          console.error('サマリーの生成に失敗しました:', error);
+          chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: 'サマリーの生成に失敗しました。', details: error.message });
+        } finally {
+          if (job.sendResponseCallback) {
+            job.sendResponseCallback({ message: "処理が完了しました。" });
+          }
+        }
+        break;
+    }
+
+    switch (request.action) {
+      case "start":
+        startRecording(request.lastMode, request.lastPersona, request.lastFeedbackMode, request.lastFaceAnalysis);
+        sendResponse({ message: "練習を開始しました。" });
+        break;
+      case "stop":
+        stopRecording(sendResponse);
+        break;
+    }
+  })();
   
-  return false;
+  return true; // 非同期処理のため
 });
 
 // (他の関数は変更なし)
@@ -327,68 +391,3 @@ async function generateSummary(analysisResults, finalConversationSummary, totalT
   chrome.tabs.update(summaryTab.id, { active: true });
 }
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && pendingSummaries[tabId]) {
-    const job = pendingSummaries[tabId];
-    delete pendingSummaries[tabId];
-
-    try {
-      if (job.analysisResults.length === 0) {
-        console.log("分析データがなかったため、サマリーを生成しませんでした。");
-        chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: '十分な分析データがありませんでした。' });
-        return;
-      }
-
-      console.log("サマリー生成を開始します。分析結果:", job.analysisResults);
-
-      const idToken = await getAuthToken();
-      if (!idToken) {
-        console.error('サマリー生成のための認証トークンがありません。');
-        chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: 'ログインしていません。サマリーを生成できませんでした。' });
-        return;
-      }
-
-      console.log('[background.js] Calling summary-report endpoint...'); // ログ3
-      const response = await fetch(CLOUD_FUNCTION_URL, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          type: 'summary-report',
-          analysisResults: job.analysisResults,
-          mode: job.mode,
-          persona: job.persona,
-          conversationSummary: job.finalConversationSummary,
-          totalTime: job.totalTime
-        })
-      });
-      console.log('[background.js] summary-report endpoint response status:', response.status); // ログ4
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "サーバーから不明なエラー応答", details: response.statusText }));
-        console.error("サマリー生成APIエラー:", errorData);
-        chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: errorData.error, details: errorData.details });
-        return;
-      }
-
-      const summaryData = await response.json();
-      console.log("サマリー生成結果:", summaryData);
-      
-      chrome.tabs.sendMessage(tabId, {
-        type: 'show_summary',
-        data: { ...summaryData, feedbackHistory: job.feedbackHistory },
-        mode: job.mode
-      });
-
-    } catch (error) {
-      console.error('サマリーの生成に失敗しました:', error);
-      chrome.tabs.sendMessage(tabId, { type: 'show_summary_error', error: 'サマリーの生成に失敗しました。', details: error.message });
-    } finally {
-      if (job.sendResponseCallback) {
-        job.sendResponseCallback({ message: "処理が完了しました。" });
-      }
-    }
-  }
-});
