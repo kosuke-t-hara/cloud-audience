@@ -36,6 +36,9 @@ try {
         }
         const rms = Math.sqrt(sum / channelData.length);
 
+        // 常に現在の音量レベルをヘルパーに送信する
+        this.port.postMessage({ type: 'volume', rms: rms });
+
         if (rms < this._silenceThreshold) {
           // 無音状態が始まった瞬間、または継続している
           if (this._silenceStartTime === 0) {

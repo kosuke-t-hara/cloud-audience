@@ -190,7 +190,7 @@ function renderActivityList(sessions) {
         // 新仕様: 合計スコアの計算
         const totalScore = calculateTotalScore(session.scores);
 
-        const truncatedName = displayName.length > 15 ? displayName.substring(0, 15) + '...' : displayName;
+        const truncatedName = displayName.length > 20 ? displayName.substring(0, 20) + '...' : displayName;
         const truncatedComment = personaComment.length > 140 ? personaComment.substring(0, 140) + '...' : personaComment;
         const timeAgo = formatTimeAgo(sessionDate);
         const fullDate = sessionDate.toLocaleString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });

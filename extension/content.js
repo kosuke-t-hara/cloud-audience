@@ -3,39 +3,73 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
   window.isPrezentoScriptInjected = true;
   console.log("Prezento AI Coachのコンテントスクリプトが注入されました。");
 
-  // タイマー要素の作成
+  // --- UI要素の管理 ---
   let timerElement = null;
+  let speakingIndicator = null;
+
+  function createUI() {
+    // タイマー要素（なければ作成）
+    if (!document.getElementById('prezento-ai-coach-timer')) {
+      timerElement = document.createElement('div');
+      timerElement.id = 'prezento-ai-coach-timer';
+      document.body.appendChild(timerElement);
+    }
+    // 発話インジケーター要素（なければ作成）
+    if (!document.getElementById('prezento-speaking-indicator')) {
+      speakingIndicator = document.createElement('div');
+      speakingIndicator.id = 'prezento-speaking-indicator';
+      document.body.appendChild(speakingIndicator);
+    }
+  }
+
+  function removeUI() {
+    const timer = document.getElementById('prezento-ai-coach-timer');
+    if (timer) timer.remove();
+    timerElement = null;
+
+    const indicator = document.getElementById('prezento-speaking-indicator');
+    if (indicator) indicator.remove();
+    speakingIndicator = null;
+    
+    console.log("UI要素を削除しました。");
+  }
+
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log('background.jsからメッセージを受信しました:', request);
+    // console.log('background.jsからメッセージを受信しました:', request); // デバッグ用にコメントアウト
 
-    // 経過時間の表示/更新
-    if (request.type === 'update_timer') {
-      if (!timerElement) {
-        // ページにタイマー要素がなければ作成する
-        timerElement = document.createElement('div');
-        timerElement.id = 'prezento-ai-coach-timer';
-        document.body.appendChild(timerElement);
-      }
-      timerElement.textContent = request.time;
-    }
+    switch (request.type) {
+      case 'update_timer':
+        createUI();
+        const timer = document.getElementById('prezento-ai-coach-timer');
+        if (timer) timer.textContent = request.time;
+        break;
 
-    if (request.type === 'show-feedback') {
-      sendResponse({ status: 'フィードバックを表示しました。' });
-      showFeedbackBubble(request.data);
-    } else if (request.type === 'show_error') { // ★ エラー表示の分岐を追加
-      sendResponse({ status: 'エラーを表示しました。' });
-      showFeedbackBubble(request.data, 'error');
-    }
+      case 'speaking_status':
+        createUI();
+        const indicator = document.getElementById('prezento-speaking-indicator');
+        if (indicator) {
+          if (request.status === 'speaking') {
+            indicator.classList.add('speaking');
+          } else {
+            indicator.classList.remove('speaking');
+          }
+        }
+        break;
 
-    // 練習終了時にタイマーを削除
-    if (request.type === 'remove_ui_elements') {
-      if (timerElement) {
-        timerElement.remove();
-        timerElement = null;
-        console.log("タイマー要素を削除しました。");
-      }
-      // TODO: リアルタイムフィードバックの要素もここで削除する
+      case 'show-feedback':
+        sendResponse({ status: 'フィードバックを表示しました。' });
+        showFeedbackBubble(request.data);
+        break;
+      
+      case 'show_error':
+        sendResponse({ status: 'エラーを表示しました。' });
+        showFeedbackBubble(request.data, 'error');
+        break;
+
+      case 'remove_ui_elements':
+        removeUI();
+        break;
     }
 
     return true;

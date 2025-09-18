@@ -90,6 +90,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.error("ヘルパーウィンドウでエラー:", request.error);
         stopRecording();
         break;
+      case 'speaking_status':
+        if (targetTabId) {
+          chrome.tabs.sendMessage(targetTabId, { type: 'speaking_status', status: request.status });
+        }
+        break;
       case 'SUMMARY_DISPLAY_COMPLETE':
         chrome.action.setBadgeText({ text: '' });
         break;

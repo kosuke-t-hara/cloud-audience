@@ -65,11 +65,27 @@
       });
       console.log("[mic_helper] AudioWorkletNodeの作成完了");
 
+      let isSpeaking = false;
+      const speakingThreshold = 0.02; // 発話検知のしきい値
+
       vadNode.onprocessorerror = (event) => {
         console.error(`[VADNode] onprocessorerrorイベント:`, event);
       };
 
       vadNode.port.onmessage = (event) => {
+        // 音量レベルのメッセージを処理
+        if (event.data.type === 'volume') {
+          const newSpeakingStatus = event.data.rms > speakingThreshold;
+          if (newSpeakingStatus !== isSpeaking) {
+            isSpeaking = newSpeakingStatus;
+            const status = isSpeaking ? 'speaking' : 'silent';
+            // console.log(`[mic_helper] Speaking status changed to: ${status}`); // デバッグ用
+            chrome.runtime.sendMessage({ type: 'speaking_status', status: status });
+          }
+          return; // volumeメッセージはここで処理終了
+        }
+
+        // 既存の無音検知メッセージを処理
         // ★★★ デバッグログ ★★★
         console.log(`[mic_helper] VADNodeからメッセージを受信:`, event.data);
         if (event.data === 'silence') {
