@@ -187,6 +187,9 @@ function renderActivityList(sessions) {
 
         const iconSvg = icons[sessionMode] || icons.default;
         
+        // ペルソナ名から色を生成
+        const personaColor = hashCodeToHsl(stringToHashCode(displayName));
+
         // 新仕様: 合計スコアの計算
         const totalScore = calculateTotalScore(session.scores);
 
@@ -196,7 +199,7 @@ function renderActivityList(sessions) {
         const fullDate = sessionDate.toLocaleString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         
         card.innerHTML = `
-            <div class="activity-card-icon">
+            <div class="activity-card-icon" style="background-color: ${personaColor};">
                 ${iconSvg}
             </div>
             <div class="activity-card-content">
@@ -236,4 +239,31 @@ function formatTimeAgo(date) {
         return Math.floor(interval) + "分前";
     }
     return Math.floor(seconds) + "秒前";
+}
+
+/**
+ * 文字列からハッシュ値を生成する
+ * @param {string} str
+ * @returns {number}
+ */
+function stringToHashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash |= 0; // 32bit整数に変換
+    }
+    return hash;
+}
+
+/**
+ * ハッシュ値からHSLカラーを生成する
+ * @param {number} hash
+ * @returns {string} HSLカラー文字列 (e.g., "hsl(120, 70%, 80%)")
+ */
+function hashCodeToHsl(hash) {
+    const h = Math.abs(hash % 360);
+    const s = 70; // 彩度
+    const l = 80; // 明度
+    return `hsl(${h}, ${s}%, ${l}%)`;
 }
