@@ -1,4 +1,17 @@
 /* session.css */
+:root {
+    --primary-color: #6B46C1; /* Purple */
+    --primary-color-light: #FAF5FF;
+    --text-color: #2D3748;
+    --text-color-secondary: #718096;
+    --bg-color: #F7FAFC;
+    --card-bg-color: #FFFFFF;
+    --border-color: #E2E8F0;
+}
+
+body {
+    background-color: var(--bg-color);
+}
 
 /* ヘッダーのスタイル */
 header nav {
@@ -20,7 +33,7 @@ header nav {
 .back-to-dashboard {
     display: inline-block;
     margin-bottom: 2rem;
-    color: #007bff;
+    color: var(--primary-color);
     text-decoration: none;
 }
 .back-to-dashboard:hover {
@@ -73,7 +86,7 @@ header nav {
 .summary-score-container .score-display #session-total-score {
     font-size: 5rem;
     font-weight: bold;
-    color: #007bff;
+    color: var(--primary-color);
     line-height: 1;
 }
 .summary-score-container .score-display .max-score {
@@ -94,7 +107,7 @@ header nav {
 }
 .detailed-feedback h3 {
     font-size: 1.2rem;
-    color: #007bff;
+    color: var(--primary-color);
     margin-bottom: 0.5rem;
 }
 .detailed-feedback p,
@@ -127,12 +140,33 @@ header nav {
     margin-bottom: 0;
 }
 
-/* 文字起こし */
-.transcript #transcript-text {
-    background-color: #f8f9fa;
-    padding: 1.5rem;
-    border-radius: 5px;
-    line-height: 1.8;
+
+/* リアルタイムフィードバック履歴 */
+.feedback-history-item {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.feedback-history-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.feedback-history-item .transcript {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.feedback-history-item .feedback {
+    color: #555;
+    padding-left: 1rem;
+    border-left: 3px solid var(--primary-color);
+}
+
+#feedback-history-list {
     max-height: 400px;
     overflow-y: auto;
+    padding-right: 1rem; /* スクロールバーのスペース */
 }

@@ -1,11 +1,4 @@
 // content.js
-console.log("Prezento AI Coachのコンテントスクリプトが注入されました。");
-
-// タイマー要素の作成
-let timerElement = null;
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  // content.js
 if (typeof window.isPrezentoScriptInjected === 'undefined') {
   window.isPrezentoScriptInjected = true;
   console.log("Prezento AI Coachのコンテントスクリプトが注入されました。");
@@ -30,6 +23,9 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
     if (request.type === 'show-feedback') {
       sendResponse({ status: 'フィードバックを表示しました。' });
       showFeedbackBubble(request.data);
+    } else if (request.type === 'show_error') { // ★ エラー表示の分岐を追加
+      sendResponse({ status: 'エラーを表示しました。' });
+      showFeedbackBubble(request.data, 'error');
     }
 
     // 練習終了時にタイマーを削除
@@ -42,10 +38,10 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
       // TODO: リアルタイムフィードバックの要素もここで削除する
     }
 
-    return;
+    return true;
   });
 
-  function showFeedbackBubble(text) {
+  function showFeedbackBubble(text, style = 'normal') {
     // 既存のフキダシがあれば削除
     const existingBubble = document.querySelector('.prezento-feedback-bubble');
     if (existingBubble) {
@@ -55,6 +51,9 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
     // 新しいフキダシを作成
     const bubble = document.createElement('div');
     bubble.className = 'prezento-feedback-bubble';
+    if (style === 'error') { // ★ エラー用のクラスを追加
+      bubble.classList.add('error');
+    }
     bubble.textContent = text;
     document.body.appendChild(bubble);
 
@@ -70,66 +69,4 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
       setTimeout(() => bubble.remove(), 500);
     }, 5000);
   }
-}
-
-
-  // 経過時間の表示/更新
-  if (request.type === 'update_timer') {
-    if (!timerElement) {
-      // ページにタイマー要素がなければ作成する
-      timerElement = document.createElement('div');
-      timerElement.id = 'prezento-ai-coach-timer';
-      document.body.appendChild(timerElement);
-    }
-    timerElement.textContent = request.time;
-  }
-
-  if (request.type === 'show-feedback') {
-    sendResponse({ status: 'フィードバックを表示しました。' });
-    showFeedbackBubble(request.data);
-  } else if (request.type === 'show_error') { // ★ エラー表示の分岐を追加
-    sendResponse({ status: 'エラーを表示しました。' });
-    showFeedbackBubble(request.data, 'error');
-  }
-
-  // 練習終了時にタイマーを削除
-  if (request.type === 'remove_ui_elements') {
-    if (timerElement) {
-      timerElement.remove();
-      timerElement = null;
-      console.log("タイマー要素を削除しました。");
-    }
-    // TODO: リアルタイムフィードバックの要素もここで削除する
-  }
-
-  return;
-});
-
-function showFeedbackBubble(text, style = 'normal') {
-  // 既存のフキダシがあれば削除
-  const existingBubble = document.querySelector('.prezento-feedback-bubble');
-  if (existingBubble) {
-    existingBubble.remove();
-  }
-
-  // 新しいフキダシを作成
-  const bubble = document.createElement('div');
-  bubble.className = 'prezento-feedback-bubble';
-  if (style === 'error') { // ★ エラー用のクラスを追加
-    bubble.classList.add('error');
-  }
-  bubble.textContent = text;
-  document.body.appendChild(bubble);
-
-  // 表示アニメーション
-  setTimeout(() => {
-    bubble.classList.add('show');
-  }, 10);
-
-  // 5秒後に自動で消す
-  setTimeout(() => {
-    bubble.classList.remove('show');
-    // アニメーションが終わってから要素を削除
-    setTimeout(() => bubble.remove(), 500);
-  }, 5000);
 }

@@ -395,7 +395,7 @@ functions.http('coachApi', async (req, res) => {
     });
 
   } else if (type === 'summary-report') {
-    const { analysisResults, conversationSummary, totalTime, mode, persona } = req.body;
+    const { analysisResults, conversationSummary, totalTime, mode, persona, feedbackHistory } = req.body;
 
     const combinedResults = {
       fullTranscript: analysisResults.map(r => r.fullTranscript).join(' '),
@@ -420,6 +420,7 @@ functions.http('coachApi', async (req, res) => {
             persona: persona,
             ...summaryResult.data,
             totalTime: totalTime,
+            feedbackHistory: feedbackHistory || [],
             createdAt: admin.firestore.FieldValue.serverTimestamp()
           };
           

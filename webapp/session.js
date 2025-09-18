@@ -69,11 +69,29 @@ function renderSessionDetails(data) {
         questionsList.innerHTML = '<li>AIからの質問はありませんでした。</li>';
     }
 
-    // 文字起こし
-    // transcriptフィールドが改行を含むテキストの場合を想定し、<br>に置換
-    const transcriptText = data.transcript ? data.transcript.replace(/\n/g, '<br>') : '文字起こしデータはありません。';
-    document.getElementById('transcript-text').innerHTML = transcriptText;
-
+    // フィードバック履歴
+    const feedbackHistoryList = document.getElementById('feedback-history-list');
+    feedbackHistoryList.innerHTML = '';
+    if (data.feedbackHistory && data.feedbackHistory.length > 0) {
+        data.feedbackHistory.forEach(item => {
+            const div = document.createElement('div');
+            div.classList.add('feedback-history-item');
+            const transcriptP = document.createElement('p');
+            transcriptP.classList.add('transcript');
+            // item.transcript が存在する場合のみ表示
+            if(item.transcript) {
+              transcriptP.textContent = `あなた: ${item.transcript}`;
+              div.appendChild(transcriptP);
+            }
+            const feedbackP = document.createElement('p');
+            feedbackP.classList.add('feedback');
+            feedbackP.textContent = `AI: ${item.feedback}`;
+            div.appendChild(feedbackP);
+            feedbackHistoryList.appendChild(div);
+        });
+    } else {
+        feedbackHistoryList.innerHTML = '<p>リアルタイムフィードバックの履歴はありませんでした。</p>';
+    }
 
     // ペルソナ設定の表示
     const personaContainer = document.getElementById('session-persona-container');
@@ -105,10 +123,10 @@ function renderRadarChart(scores) {
             datasets: [{
                 label: 'スコア',
                 data: data,
-                backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                borderColor: 'rgba(0, 123, 255, 1)',
+                backgroundColor: 'rgba(107, 70, 193, 0.2)', // --primary-colorのRGBa
+                borderColor: 'rgba(107, 70, 193, 1)',     // --primary-color
                 borderWidth: 2,
-                pointBackgroundColor: 'rgba(0, 123, 255, 1)'
+                pointBackgroundColor: 'rgba(107, 70, 193, 1)' // --primary-color
             }]
         },
         options: {

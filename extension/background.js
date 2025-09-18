@@ -153,7 +153,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               mode: job.mode,
               persona: job.persona,
               conversationSummary: job.finalConversationSummary,
-              totalTime: job.totalTime
+              totalTime: job.totalTime,
+              feedbackHistory: job.feedbackHistory
             })
           });
 
@@ -390,4 +391,3 @@ async function generateSummary(analysisResults, finalConversationSummary, totalT
   
   chrome.tabs.update(summaryTab.id, { active: true });
 }
-
