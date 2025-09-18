@@ -117,11 +117,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
       // レーダーチャートのラベルをモードに応じて変更
       const labels = (mode === 'presenter')
-        ? ['明朗さ', '情熱度', '示唆度', '構成力', '自信']
+        ? ['明朗さ', '情熱度', '論理性', '構成力', '自信']
         : ['掴みの強さ', 'エンタメ性', '緩急', 'キラーフレーズ', '安全性'];
       
       const scores = (mode === 'presenter')
-        ? [data.scores.clarity, data.scores.passion, data.scores.insightfulness, data.scores.structure, data.scores.confidence]
+        ? [data.scores.clarity, data.scores.passion, data.scores.logic, data.scores.structure, data.scores.confidence]
         : [data.scores.hook_strength, data.scores.entertainment, data.scores.pacing, data.scores.killer_phrase, data.scores.safety_risk];
 
       if (data.analysis) {

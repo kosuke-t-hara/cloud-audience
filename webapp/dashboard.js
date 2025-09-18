@@ -101,18 +101,18 @@ function renderScoreChart(sessions) {
         return `${date.getMonth() + 1}月${date.getDate()}日`;
     });
 
-    const scoreKeys = ['clarity', 'passion', 'insightfulness', 'structure', 'confidence'];
+    const scoreKeys = ['clarity', 'passion', 'logic', 'structure', 'confidence'];
     const scoreLabels = {
         clarity: '明瞭さ',
         passion: '情熱',
-        insightfulness: '示唆',
+        logic: '論理性',
         structure: '構成力',
         confidence: '自信'
     };
     const colors = {
         clarity: 'rgba(128, 90, 213, 0.6)',
         passion: 'rgba(159, 122, 234, 0.6)',
-        insightfulness: 'rgba(196, 181, 253, 0.6)',
+        logic: 'rgba(196, 181, 253, 0.6)',
         structure: 'rgba(221, 214, 254, 0.6)',
         confidence: 'rgba(237, 233, 254, 0.8)'
     };

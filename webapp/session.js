@@ -107,11 +107,11 @@ function renderSessionDetails(data) {
 
 function renderRadarChart(scores) {
     const ctx = document.getElementById('score-radar-chart').getContext('2d');
-    const labels = ['明瞭さ', '情熱', '洞察力', '構成力', '自信'];
+    const labels = ['明朗さ', '情熱', '論理性', '構成力', '自信'];
     const data = [
         scores.clarity,
         scores.passion,
-        scores.insightfulness,
+        scores.logic,
         scores.structure,
         scores.confidence
     ];
