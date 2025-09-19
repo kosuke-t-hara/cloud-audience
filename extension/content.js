@@ -36,7 +36,7 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
 
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    // console.log('background.jsからメッセージを受信しました:', request); // デバッグ用にコメントアウト
+    const needsAsyncResponse = request.type === 'show-feedback' || request.type === 'show_error';
 
     switch (request.type) {
       case 'update_timer':
@@ -57,6 +57,11 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
         }
         break;
 
+      case 'trigger_feedback_effect':
+        console.log('[content.js] Received trigger_feedback_effect');
+        showFlyingFeedbackEffect();
+        break;
+
       case 'show-feedback':
         sendResponse({ status: 'フィードバックを表示しました。' });
         showFeedbackBubble(request.data);
@@ -72,8 +77,46 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
         break;
     }
 
-    return true;
+    return needsAsyncResponse;
   });
+
+  /**
+   * 発話インジケーターから右下へ飛ぶエフェクトを表示する
+   */
+  function showFlyingFeedbackEffect() {
+    console.log('[content.js] showFlyingFeedbackEffect called.');
+    createUI(); // UI要素が確実に存在するようにする
+    const indicator = document.getElementById('prezento-speaking-indicator');
+    if (!indicator) {
+      console.error('[content.js] Speaking indicator not found! Cannot create effect.');
+      return;
+    }
+
+    // インジケーターの位置を取得
+    const rect = indicator.getBoundingClientRect();
+    // エフェクトの中心がインジケーターの中心から始まるように、エフェクトの半径(7.5px)分ずらす
+    const startX = rect.left + (rect.width / 2) - 7.5;
+    const startY = rect.top + (rect.height / 2) - 7.5;
+
+    const comet = document.createElement('div');
+    comet.className = 'prezento-feedback-comet';
+    // 初期位置を設定
+    comet.style.top = `${startY}px`;
+    comet.style.left = `${startX}px`;
+    
+    document.body.appendChild(comet);
+
+    // 強制リフローをトリガーして、ブラウザに要素の初期状態を確実に描画させる
+    void comet.offsetWidth; 
+
+    // 強制リフロー直後にアニメーションクラスを追加する
+    comet.classList.add('animate');
+
+    // アニメーション終了後に要素を削除
+    setTimeout(() => {
+      comet.remove();
+    }, 600); // CSSのanimation durationと合わせる
+  }
 
   function showFeedbackBubble(text, style = 'normal') {
     // 既存のフキダシがあれば削除

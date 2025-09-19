@@ -78,6 +78,13 @@ chrome.windows.onRemoved.addListener((windowId) => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // 非同期応答が必要なメッセージタイプを判定
+  const needsAsyncResponse = 
+    request.type === 'GET_AUTH_STATE' || 
+    request.action === 'start' || 
+    request.action === 'stop';
+
+  // 非同期処理を即時実行関数でラップ
   (async () => {
     switch (request.type) {
       case 'video_frame':
@@ -199,7 +206,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
   })();
   
-  return true; // 非同期処理のため
+  return needsAsyncResponse;
 });
 
 // (他の関数は変更なし)
@@ -302,6 +309,11 @@ async function handleAudioChunk(audioContent) {
 
     if (isFaceAnalysisEnabled) {
       requestBody.videoFrameContent = latestVideoFrame;
+    }
+
+    // エフェクト表示のトリガーをcontent.jsに送信
+    if (targetTabId) {
+      chrome.tabs.sendMessage(targetTabId, { type: 'trigger_feedback_effect' });
     }
 
     const response = await fetch(CLOUD_FUNCTION_URL, {

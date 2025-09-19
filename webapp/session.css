@@ -61,12 +61,30 @@ header nav {
 .report-summary .summary-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
     margin-bottom: 1.5rem;
 }
 .report-summary .summary-header p {
     font-size: 1.1rem;
     color: #666;
+}
+
+.persona-display {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: var(--primary-color-light);
+    border-radius: 6px;
+    display: flex;
+    align-items: baseline;
+}
+.persona-display .persona-label {
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-right: 0.5em;
+    flex-shrink: 0;
+}
+.persona-display #session-persona {
+    word-break: break-all;
+    white-space: pre-wrap; /* 改行とスペースを保持 */
 }
 
 .summary-score-container {

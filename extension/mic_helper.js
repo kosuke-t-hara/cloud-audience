@@ -121,6 +121,7 @@
           const base64Audio = reader.result.split(',')[1];
           // ★★★ デバッグログ ★★★
           console.log(`[mic_helper] Base64エンコード完了。background.jsに送信します。データ長=${base64Audio.length}`);
+          // 音声データを送信
           chrome.runtime.sendMessage({ type: 'audio_chunk', data: base64Audio });
         };
         reader.readAsDataURL(e.data);

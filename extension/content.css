@@ -1,7 +1,7 @@
 /* content.css */
 .prezento-feedback-bubble {
   position: fixed;
-  bottom: 20px;
+  bottom: 80px; /* タイマーと重ならないように上へ移動 */
   right: 20px;
   background-color: rgba(0, 0, 0, 0.7);
   color: white;
@@ -46,7 +46,7 @@
 #prezento-speaking-indicator {
   position: fixed;
   /* タイマーと垂直位置を合わせる */
-  bottom: 24px;
+  bottom: 27px; /* 高さを微調整 */
   /* タイマーと重ならないように右側の位置を調整 */
   right: 120px; 
   width: 24px;
@@ -75,5 +75,36 @@
   100% {
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
+  }
+}
+
+/* --- フィードバック送信時エフェクト（射出） --- */
+.prezento-feedback-comet {
+  position: fixed;
+  width: 15px;
+  height: 15px;
+  background-color: #f44336; /* 発話インジケーターと同じ赤色 */
+  border-radius: 50%;
+  z-index: 9999999;
+  pointer-events: none;
+  opacity: 0.8;
+  box-shadow: 0 0 10px 2px rgba(244, 67, 54, 0.7);
+}
+
+/* アニメーションをトリガーするためのクラス */
+.prezento-feedback-comet.animate {
+  animation: shoot-up 0.6s ease-out forwards;
+}
+
+@keyframes shoot-up {
+  0% {
+    /* JavaScript側で設定された初期位置 */
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    /* 真上に移動して消える */
+    transform: translateY(-75px) scale(0.5);
+    opacity: 0;
   }
 }
