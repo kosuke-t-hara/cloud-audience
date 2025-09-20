@@ -29,9 +29,74 @@ const loadingMessages = [
   "あなたの話術から「いいね！」を探しています。",
   "フィードバックを金箔で飾り付け中...",
   "改善点を分かりやすく翻訳しています...",
-  "自分自身とブレインストーミング中です。なかなか良いアイデアが出ます。"
+  "自分自身とブレインストーミング中です。なかなか良いアイデアが出ます。",
+  // --- ここから70個の追加メッセージ ---
+  // サイバー
+  "ロジックゲートを開放...",
+  "データストリームにダイブしています...",
+  "ポジトロン頭脳を再調整中...",
+  "あなたの発話をバイトコードに変換...",
+  "サイバースペースで答えを検索中...",
+  "量子コンピュータが計算を始めました...",
+  "ゴーストが囁いています...良いフィードバックを...",
+  "ファイアウォールを越えて、核心に迫ります...",
+  " eloquence.dll を読み込んでいます...",
+  "思考のデフラグを実行中...",
+  "あなたの声紋を認証しました...",
+  "ホログラムの賢者と対話しています...",
+  "銀河ハイウェイで情報を収集中...",
+  "レトリックの構文エラーをチェック...",
+  "APIコール... 応答待ち...",
+  "機械学習モデルを叩き起こしています...",
+  "あなたの言葉をベクトル化しています...",
+  "トランスフォーマーが自己注意メカニズムを展開...",
+  "パラメータの海を泳いでいます...",
+  "イーサネットケーブルの向こう側と交信中...",
+  // マジカル
+  "グリモワールを開き、古代の知恵を参照...",
+  "マナを充填しています... 少々お待ちください...",
+  "錬金術であなたの言葉を黄金に変えます...",
+  "水晶玉に未来のあなたの姿を映しています...",
+  "妖精たちがあなたの言葉を分析しています...",
+  "ドラゴンの吐息でアイデアを温めています...",
+  "賢者の石で本質を抽出中...",
+  "ルーン文字を解読しています...",
+  "召喚サークルからアドバイスを呼び出し中...",
+  "世界樹の根から情報を吸い上げています...",
+  "魔法陣を展開。解析を開始します...",
+  "光の精霊に意見を聞いています...",
+  "あなたのスピーチに祝福の魔法を...",
+  "星の配置からあなたの強みを占っています...",
+  "忘却の呪文で「えーっと」を消去中...",
+  "アカシックレコードにアクセスしています...",
+  "羊皮紙にフィードバックを書き記しています...",
+  "見えざる手がお手伝いしています...",
+  "魔法薬を調合中... あとカエルの目玉が一つ...",
+  "あなたのカリスマにリミッターを解除...",
+  // 牧歌的
+  "アイデアの種を植えています...",
+  "小川のせせらぎに耳を澄ましています...",
+  "羊の数を数えています...じゃなくて、フィラーワードを...",
+  "焼きたてのパンのように、フィードバックをこねています...",
+  "あなたの言葉を、そよ風に乗せて...",
+  "村の長老が知恵を貸してくれています...",
+  "星空の下で、あなたのスピーチを反芻しています...",
+  "言葉の糸で美しいタペストリーを織っています...",
+  "インスピレーションの泉で水を汲んでいます...",
+  "静かな森で思考を整理しています...",
+  "あなたの話から、熟した果実を収穫中...",
+  "暖炉のそばで、改善点を考えています...",
+  "雨上がりの虹を探しています...",
+  "鳥のさえずりがヒントをくれました...",
+  "ゆっくりと、丁寧に、言葉を紡いでいます...",
+  "地平線に昇る朝日を待っています...",
+  "あなたの声の響きを、山のこだまに聞いています...",
+  "畑を耕し、新しい視点を育てています...",
+  "井戸端会議であなたの評判を聞いています...",
+  "お茶を一杯。さて、もう一仕事です...",
 ];
 let messageInterval = null;
+let summaryTimeout = null; // タイムアウトIDを保持する変数
 
 function startLoadingAnimation() {
   const messageElement = document.getElementById('loading-message');
@@ -56,9 +121,28 @@ function stopLoadingAnimation() {
   }
 }
 
+// --- タイムアウト処理 ---
+function handleTimeout() {
+  stopLoadingAnimation();
+  document.getElementById('loading-container').style.display = 'none';
+  document.getElementById('summary-content').style.display = 'none';
+  document.getElementById('error-container').style.display = 'none';
+  
+  // タイムアウト用のコンテナを表示
+  const timeoutContainer = document.getElementById('timeout-container');
+  if (timeoutContainer) {
+    timeoutContainer.style.display = 'block';
+  }
+}
+
+
 // --- 初期化処理 ---
 document.addEventListener('DOMContentLoaded', () => {
   startLoadingAnimation();
+  
+  // 15秒後にタイムアウト処理を実行するタイマーを設定
+  summaryTimeout = setTimeout(handleTimeout, 15000);
+
   // サマリーページの準備ができたことをバックグラウンドに通知
   chrome.runtime.sendMessage({ type: 'SUMMARY_PAGE_READY' });
 });
@@ -79,9 +163,21 @@ window.addEventListener('beforeunload', () => {
 
 // --- メッセージリスナー ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // サマリーが表示される前にタイムアウトタイマーをクリア
+  if (summaryTimeout) {
+    clearTimeout(summaryTimeout);
+    summaryTimeout = null;
+  }
+
   const loadingContainer = document.getElementById('loading-container');
   const errorContainer = document.getElementById('error-container');
   const summaryContent = document.getElementById('summary-content');
+  const timeoutContainer = document.getElementById('timeout-container');
+
+  // 正常な応答があった場合は、タイムアウト表示を確実に非表示にする
+  if (timeoutContainer) {
+    timeoutContainer.style.display = 'none';
+  }
 
   if (request.type === 'show_summary') {
     stopLoadingAnimation();
