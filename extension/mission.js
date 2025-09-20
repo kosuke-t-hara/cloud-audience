@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const missionScenario = document.getElementById('mission-scenario');
     const missionObjective = document.getElementById('mission-objective');
     const startMissionButton = document.getElementById('start-mission-button');
+    const finishMissionButton = document.getElementById('finish-mission-button');
 
     const statusText = document.getElementById('status-text');
     const transcriptLog = document.getElementById('transcript-log');
@@ -78,6 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
         transcriptLog.scrollTop = transcriptLog.scrollHeight; // 自動スクロール
     }
 
+    let isFinishing = false; // 完了処理中のフラグ
+
     // --- イベントリスナーの設定 ---
     startMissionButton.addEventListener('click', () => {
         // UIを対話ビューに切り替え
@@ -85,22 +88,25 @@ document.addEventListener('DOMContentLoaded', () => {
         activeView.style.display = 'block';
         statusText.textContent = 'マイクの準備をしています...';
 
-        // background.jsにミッション開始を通知し、マイク入力を開始させる
+        // background.jsに音声記録の開始を通知する
         chrome.runtime.sendMessage({
-            action: "startMission",
-            missionId: currentMissionId
+            action: "startMissionAudio"
         }, (response) => {
             if (chrome.runtime.lastError) {
                 console.error(chrome.runtime.lastError.message);
                 statusText.textContent = 'エラー: 開始に失敗しました。';
-            } else if (!response.success) {
-                console.error('Failed to start mission:', response.error);
+            } else if (response && !response.success) {
+                console.error('Failed to start mission audio:', response.error);
                 statusText.textContent = `エラー: ${response.error}`;
             } else {
-                console.log(response.message);
-                // 実際のステータス更新はonMessageリスナーに任せる
+                console.log(response?.message);
+                statusText.textContent = 'AIの応答を待っています...'; // 成功したらステータスを更新
             }
         });
+    });
+
+    finishMissionButton.addEventListener('click', () => {
+        finishMission();
     });
 
     // background.jsからのメッセージをリッスンする
@@ -111,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         switch (request.type) {
-            case 'TRANSCRIPT_UPDATE':
+            case 'MISSION_TRANSCRIPT_UPDATE':
                 addTranscript(request.speaker, request.text);
                 break;
             case 'STATUS_UPDATE':
@@ -128,6 +134,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- ミッション完了処理 ---
     function finishMission() {
+        if (isFinishing) return; // 既に完了処理が始まっていれば何もしない
+        isFinishing = true;
+        finishMissionButton.disabled = true; // ボタンを無効化
         statusText.textContent = 'ミッション完了！結果を計算しています...';
         
         // background.jsにスコアリングを依頼する

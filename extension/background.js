@@ -212,11 +212,64 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         startRecording(request.lastMode, request.lastPersona, request.lastFeedbackMode, request.lastFaceAnalysis);
         sendResponse({ message: "練習を開始しました。" });
         break;
-      case "startMission":
-        startMission(request.missionId, sendResponse);
+      case "startMission": // from popup.js
+        // ミッションのパラメータをグローバル変数に保存するだけにする
+        currentMode = 'mission';
+        currentPersona = request.persona;
+        currentSettings = request.settings; // settings全体を保存
+        targetTabId = request.tabId; // popup.jsから渡されたタブIDを保存
+        
+        console.log(`ミッション準備完了: ${targetTabId}`);
+        sendResponse({ success: true, message: "ミッションの準備ができました。" });
         break;
-      case "requestScoring":
-        requestScoring(request.missionId, request.transcript, sendResponse);
+      
+      case "startMissionAudio": // from mission.js
+        // mission.jsからのトリガーで録音を開始する
+        if (currentMode === 'mission' && targetTabId) {
+          startRecording(
+            currentMode,
+            currentPersona,
+            currentSettings.lastFeedbackMode,
+            currentSettings.lastFaceAnalysis,
+            targetTabId // 保存しておいたタブIDを渡す
+          );
+          sendResponse({ success: true, message: "ミッションの音声を記録開始しました。" });
+        } else {
+          console.error("ミッションの音声記録を開始できませんでした。モードまたはタブIDが無効です。");
+          sendResponse({ success: false, error: "ミッションが正しくセットアップされていません。" });
+        }
+        break;
+
+      case "requestScoring": // from popup.js
+        // スコアリングリクエストをCloud Functionに転送する
+        try {
+          const idToken = await getAuthToken();
+          if (!idToken) {
+            sendResponse({ success: false, error: "ログインしていません。" });
+            return;
+          }
+          const response = await fetch(CLOUD_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+              type: 'mission-scoring',
+              objective: request.objective,
+              transcript: request.transcript
+            })
+          });
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: "サーバーから不明なエラー応答" }));
+            throw new Error(errorData.error || `APIエラー: ${response.status}`);
+          }
+          const results = await response.json();
+          sendResponse({ success: true, results: results });
+        } catch (error) {
+          console.error("Scoring request failed:", error);
+          sendResponse({ success: false, error: error.message });
+        }
         break;
       case "stop":
         stopRecording(sendResponse);
@@ -229,7 +282,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // (他の関数は変更なし)
 // --- メインロジック ---
-function startRecording(mode, persona, feedbackMode, faceAnalysis) {
+function startRecording(mode, persona, feedbackMode, faceAnalysis, tabId = null) {
   clearInterval(timerInterval);
 
   currentMode = mode || 'presenter';
@@ -256,21 +309,38 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis) {
   chrome.action.setBadgeText({ text: 'REC' });
   chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
 
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (!tabs[0]) {
-      console.error("操作対象のタブが見つかりません。");
-      return;
-    }
-    targetTabId = tabs[0].id;
+  const setupRecordingTab = (id) => {
+    targetTabId = id;
 
-    chrome.scripting.insertCSS({ target: { tabId: targetTabId }, files: ["content.css"] });
-    chrome.scripting.executeScript({ target: { tabId: targetTabId }, files: ["content.js"] });
+    // ミッションモードの場合は、content scriptを注入しない
+    if (currentMode !== 'mission') {
+      chrome.scripting.insertCSS({ target: { tabId: targetTabId }, files: ["content.css"] });
+      chrome.scripting.executeScript({ target: { tabId: targetTabId }, files: ["content.js"] });
+    }
 
     const helperUrl = `mic_helper.html?faceAnalysis=${isFaceAnalysisEnabled ? 'on' : 'off'}`;
-    chrome.windows.create({ url: helperUrl, type: 'popup', width: 250, height: 150 }, (win) => {
+    chrome.windows.create({
+      url: helperUrl,
+      type: 'popup',
+      width: 250,
+      height: 150,
+      focused: false
+    }, (win) => {
       helperWindowId = win.id;
     });
-  });
+  };
+
+  if (tabId) {
+    setupRecordingTab(tabId);
+  } else {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs[0]) {
+        console.error("操作対象のタブが見つかりません。");
+        return;
+      }
+      setupRecordingTab(tabs[0].id);
+    });
+  }
 }
 
 function stopRecording(sendResponseCallback) {
@@ -282,7 +352,7 @@ function stopRecording(sendResponseCallback) {
   
   clearInterval(timerInterval);
   timerInterval = null;
-  if (targetTabId) {
+  if (targetTabId && currentMode !== 'mission') {
       chrome.tabs.sendMessage(targetTabId, { type: 'remove_ui_elements' });
   }
 
@@ -312,8 +382,11 @@ async function handleAudioChunk(audioContent) {
       return;
     }
 
-    const screenshot = await captureVisibleTab();
-    const imageContent = screenshot ? screenshot.split(',')[1] : null;
+    let imageContent = null;
+    if (currentMode !== 'mission') {
+      const screenshot = await captureVisibleTab();
+      imageContent = screenshot ? screenshot.split(',')[1] : null;
+    }
 
     const requestBody = {
       type: 'realtime-feedback',
@@ -378,19 +451,31 @@ async function handleAudioChunk(audioContent) {
       conversationHistory.push({ role: 'user', parts: [{ text: data.transcript }] });
       conversationHistory.push({ role: 'model', parts: [{ text: data.feedback }] });
 
-      switch (currentFeedbackMode) {
-        case 'realtime':
-          if (targetTabId) {
-            chrome.tabs.sendMessage(targetTabId, { type: 'show-feedback', data: data.feedback });
-          }
-          break;
-        case 'badge':
-          chrome.action.setBadgeText({ text: '💡' });
-          chrome.action.setBadgeBackgroundColor({ color: '#FBC02D' });
-          break;
-        case 'summary':
-          break;
+      // ★★★ ここから修正 ★★★
+      if (currentMode === 'mission') {
+        // ミッションモードの場合：mission.jsに対話ログとステータスを送信
+        if (targetTabId) {
+          chrome.tabs.sendMessage(targetTabId, { type: 'MISSION_TRANSCRIPT_UPDATE', speaker: 'user', text: data.transcript });
+          chrome.tabs.sendMessage(targetTabId, { type: 'MISSION_TRANSCRIPT_UPDATE', speaker: 'ai', text: data.feedback });
+          chrome.tabs.sendMessage(targetTabId, { type: 'STATUS_UPDATE', status: 'あなたの応答を待っています...' });
+        }
+      } else {
+        // フリープレイモードの場合：既存の処理
+        switch (currentFeedbackMode) {
+          case 'realtime':
+            if (targetTabId) {
+              chrome.tabs.sendMessage(targetTabId, { type: 'show-feedback', data: data.feedback });
+            }
+            break;
+          case 'badge':
+            chrome.action.setBadgeText({ text: '💡' });
+            chrome.action.setBadgeBackgroundColor({ color: '#FBC02D' });
+            break;
+          case 'summary':
+            break;
+        }
       }
+      // ★★★ ここまで修正 ★★★
     }
   } catch (error) {
     console.error("handleAudioChunk内でエラーが発生しました:", error);
@@ -430,25 +515,35 @@ async function generateSummary(analysisResults, finalConversationSummary, totalT
 // --- Mission Mode Functions ---
 
 async function startMission(missionId, sendResponse) {
+  // 既存のタイマーやセッションがあればクリア
+  clearInterval(timerInterval);
+  if (targetTabId) {
+    chrome.tabs.sendMessage(targetTabId, { type: 'remove_ui_elements' }).catch(e => console.log(e));
+  }
+
   const db = firebase.firestore();
   try {
     const missionDoc = await db.collection('missions').doc(missionId).get();
     if (missionDoc.exists) {
       const missionData = missionDoc.data();
       
-      // popup.htmlで設定された最新の設定値を取得
-      const settings = await new Promise((resolve) => {
-        chrome.storage.local.get(['lastFeedbackMode', 'lastFaceAnalysis', 'lastLanguage', 'silenceThreshold', 'pauseDuration'], resolve);
-      });
+      // ミッションページを開き、そのタブIDを保存
+      const missionUrl = chrome.runtime.getURL(`mission.html?mission_id=${missionId}`);
+      chrome.tabs.create({ url: missionUrl }, (tab) => {
+        targetTabId = tab.id; // ★ targetTabId を設定
 
-      // 取得したペルソナと設定で練習を開始
-      startRecording(
-        'mission', // mode
-        missionData.persona, // persona
-        settings.lastFeedbackMode,
-        settings.lastFaceAnalysis
-      );
-      sendResponse({ success: true, message: "ミッションを開始しました。" });
+        // popup.htmlで設定された最新の設定値を取得
+        chrome.storage.local.get(['lastFeedbackMode', 'lastFaceAnalysis'], (settings) => {
+          // 取得したペルソナと設定で練習を開始
+          startRecording(
+            'mission', // mode
+            missionData.persona, // persona
+            settings.lastFeedbackMode,
+            settings.lastFaceAnalysis
+          );
+          sendResponse({ success: true, message: "ミッションを開始しました。" });
+        });
+      });
 
     } else {
       console.error("Mission not found in Firestore:", missionId);

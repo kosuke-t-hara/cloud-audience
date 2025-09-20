@@ -46,7 +46,7 @@
 #prezento-speaking-indicator {
   position: fixed;
   /* タイマーと垂直位置を合わせる */
-  bottom: 27px; /* 高さを微調整 */
+  bottom: 25px; /* 高さを微調整 */
   /* タイマーと重ならないように右側の位置を調整 */
   right: 120px; 
   width: 24px;

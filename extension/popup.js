@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // --- Firebaseの初期化 ---
   const app = firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
+  const db = firebase.firestore(); // Firestoreを初期化
 
   // --- UI更新関数 ---
   function updateUI(user) {
@@ -109,10 +110,6 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error("バックグラウンドでのログインに失敗しました:", response?.error);
           }
         });
-        // auth.signInWithCredential(credential)
-        //   .catch((error) => {
-        //     console.error("Firebaseへのログインに失敗しました:", error);
-        //   });
       } catch (error) {
         console.error("トークンの処理中にエラーが発生しました:", error);
       }
@@ -205,7 +202,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     chrome.storage.local.set(settings).then(() => {
       if (practiceMode === 'free') {
-        // フリープレイの場合：既存の処理
         chrome.runtime.sendMessage({
           action: "start",
           ...settings
@@ -215,12 +211,10 @@ document.addEventListener('DOMContentLoaded', function () {
           } else {
             console.log(response?.message);
           }
+          window.close();
         });
       } else if (practiceMode === 'mission') {
-        // ミッションモードの場合：新しいタブを開く
-        const missionUrl = chrome.runtime.getURL('mission.html?mission_id=reconcile_with_ai_01');
-        chrome.tabs.create({ url: missionUrl });
-        window.close(); // ポップアップを閉じる
+        startMission("reconcile_with_ai_01", settings); // MVPでは固定
       }
     });
   });
@@ -233,13 +227,47 @@ document.addEventListener('DOMContentLoaded', function () {
     chrome.runtime.sendMessage({ action: "stop" }, (response) => {
       if (chrome.runtime.lastError) {
         console.error("停止処理中にエラー:", chrome.runtime.lastError.message);
-        // エラーが発生してもウィンドウは閉じる
         window.close();
       } else {
         console.log("バックグラウンドからの応答:", response?.message);
-        // 応答を受け取ってからウィンドウを閉じる
         window.close();
       }
     });
   });
+
+  // --- Mission Mode Functions (Firestore access) ---
+  async function startMission(missionId, settings) {
+    try {
+      const missionDoc = await db.collection('missions').doc(missionId).get();
+      if (missionDoc.exists) {
+        const missionData = missionDoc.data();
+        
+        const missionUrl = chrome.runtime.getURL(`mission.html?mission_id=${missionId}`);
+        chrome.tabs.create({ url: missionUrl }, (tab) => {
+          // background.jsに録音開始を依頼
+          chrome.runtime.sendMessage({
+            action: "startMission",
+            persona: missionData.persona,
+            settings: settings,
+            tabId: tab.id // 作成したタブのIDを渡す
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error(chrome.runtime.lastError.message);
+            } else {
+              console.log(response?.message);
+            }
+            window.close(); // メッセージ送信後にポップアップを閉じる
+          });
+        });
+      } else {
+        console.error("Mission not found in Firestore:", missionId);
+        // TODO: ユーザーにエラーを通知
+        window.close();
+      }
+    } catch (error) {
+      console.error("Error starting mission:", error);
+      // TODO: ユーザーにエラーを通知
+      window.close();
+    }
+  }
 });

@@ -352,6 +352,67 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
   }
 }
 
+async function getGeminiMissionScore(objective, transcript) {
+  const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}`;
+
+  const prompt = `
+    あなたは、対話シミュレーションの採点を行う厳格な審査員です。
+    以下の「ミッションのクリア条件」と「対話ログ」を分析し、評価をJSON形式で出力してください。
+
+    # ミッションのクリア条件
+    ${objective}
+
+    # 対話ログ
+    ${transcript}
+
+    # あなたのタスク
+    1.  **成否判定 (success):** 対話ログの内容が「ミッションのクリア条件」を明確に満たしているかを判断し、trueかfalseで回答してください。
+    2.  **スコア (score):** ミッションの達成度を0から100の整数で採点してください。クリア条件を完全に満たしていれば100点です。部分的に達成している場合は、その度合いに応じて点数をつけてください。失敗している場合は40点以下となります。
+    3.  **総評 (message):** この対話の良かった点と、次にもっと良くするためのアドバイスを、合わせて200字以内の短い文章で生成してください。
+
+    # 出力形式 (必ずこのJSON形式で出力してください)
+    {
+      "success": <boolean>,
+      "score": <number>,
+      "message": "<string>"
+    }
+  `;
+
+  const requestBody = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+    }
+  };
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Gemini API Error: ${response.status} ${response.statusText}`, errorText);
+      return { success: false, error: `API request failed with status ${response.status}` };
+    }
+
+    const data = await response.json();
+    if (data.candidates && data.candidates.length > 0) {
+      const jsonString = data.candidates[0].content.parts[0].text;
+      const result = JSON.parse(jsonString);
+      return { success: true, data: result };
+    } else {
+      console.error('Gemini Mission Score APIからの応答が不正です:', JSON.stringify(data, null, 2));
+      return { success: false, error: 'Invalid response structure from mission score API.' };
+    }
+  } catch (error) {
+    console.error('Gemini Mission Score APIの呼び出しまたはパースエラー:', error);
+    return { success: false, error: 'Failed to call or parse response from mission score API.', details: error.message };
+  }
+}
+
 functions.http('coachApi', async (req, res) => {
   // CORSミドルウェアをPromiseでラップしてawaitで処理を待つ
   await new Promise((resolve, reject) => {
@@ -378,7 +439,7 @@ functions.http('coachApi', async (req, res) => {
   let userId = null;
 
   // --- 認証チェック ---
-  const needsAuth = ['summary-report', 'get-history', 'realtime-feedback'];
+  const needsAuth = ['summary-report', 'get-history', 'realtime-feedback', 'mission-scoring'];
   if (needsAuth.includes(type)) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -457,6 +518,17 @@ functions.http('coachApi', async (req, res) => {
         }
       } else {
       res.status(500).send({ error: "サマリーの生成に失敗しました。", details: summaryResult.error, rawDetails: summaryResult.details });
+    }
+  } else if (type === 'mission-scoring') {
+    const { objective, transcript } = req.body;
+    if (!objective || !transcript) {
+      return res.status(400).send('Bad Request: objective and transcript are required.');
+    }
+    const scoringResult = await getGeminiMissionScore(objective, transcript);
+    if (scoringResult.success) {
+      res.status(200).send(scoringResult.data);
+    } else {
+      res.status(500).send({ error: "スコアリングに失敗しました。", details: scoringResult.error });
     }
   } else if (type === 'get-history') {
     try {
