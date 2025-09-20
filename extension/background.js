@@ -32,6 +32,7 @@ let consecutiveFailures = 0;
 let timerInterval = null;
 let elapsedTimeInSeconds = 0;
 const pendingSummaries = {};
+let isDetectionPaused = false; // ★ 発話検知の一時停止状態
 
 
 // --- 認証状態の監視とブロードキャスト ---
@@ -101,6 +102,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       case 'speaking_status':
         if (targetTabId) {
           chrome.tabs.sendMessage(targetTabId, { type: 'speaking_status', status: request.status });
+        }
+        break;
+      // ★ 発話検知の一時停止/再開をトグル
+      case 'TOGGLE_PAUSE_DETECTION':
+        isDetectionPaused = !isDetectionPaused;
+        // content.jsに状態を通知してボタンテキストを更新
+        if (targetTabId) {
+          chrome.tabs.sendMessage(targetTabId, { type: 'PAUSE_STATE_CHANGED', isPaused: isDetectionPaused });
+        }
+        // mic_helper.jsに状態を通知してVADを制御
+        if (helperWindowId) {
+          chrome.runtime.sendMessage({ type: 'SET_PAUSE_STATE', paused: isDetectionPaused });
         }
         break;
       case 'SUMMARY_DISPLAY_COMPLETE':
@@ -296,6 +309,7 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis, tabId = null)
   sessionFeedbackHistory = [];
   elapsedTimeInSeconds = 0;
   consecutiveFailures = 0;
+  isDetectionPaused = false; // ★ 録音開始時に必ずリセット
 
   timerInterval = setInterval(() => {
     elapsedTimeInSeconds++;
@@ -367,6 +381,10 @@ function stopRecording(sendResponseCallback) {
 }
 
 async function handleAudioChunk(audioContent) {
+  // ★ 一時停止中は処理をスキップ
+  if (isDetectionPaused) {
+    return;
+  }
   if (!isRecording) {
     return;
   }

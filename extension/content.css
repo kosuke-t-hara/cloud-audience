@@ -108,3 +108,25 @@
     opacity: 0;
   }
 }
+
+/* --- ★★★ 追加: 発話検知コントロールボタン --- */
+#prezento-pause-button {
+  position: fixed;
+  bottom: 20px;
+  /* インジケーターのさらに左に配置 */
+  right: 160px; 
+  z-index: 999999;
+  padding: 8px 12px;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px;
+  background-color: #fff;
+  color: #6750A4; /* プライマリカラー */
+  border: 1px solid #CAC4D0; /* アウトラインカラー */
+  border-radius: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+#prezento-pause-button:hover {
+  background-color: #E8DEF8; /* セカンダリカラー */
+}

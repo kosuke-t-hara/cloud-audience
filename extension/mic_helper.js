@@ -158,24 +158,30 @@
     console.error("[mic_helper] 初期化処理中にエラーが発生:", err);
   }
 
-  // 停止命令のリスナー
-  chrome.runtime.onMessage.addListener((request) => {
-    if (request.type === 'stop_recording') {
-      console.log("[mic_helper] 録音停止命令を受信");
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        console.log("[mic_helper] 全てのメディアトラックを停止しました。");
-      }
-      if (recorder && recorder.state === 'recording') {
-        console.log("[mic_helper] recorder.stop() を呼び出します (最終)。");
-        recorder.stop();
-      }
-      if (audioContext) {
-        audioContext.close();
-        console.log("[mic_helper] AudioContextを閉じました。");
-      }
-      window.close();
+  // 停止命令と一時停止/再開命令のリスナー
+chrome.runtime.onMessage.addListener((request) => {
+  if (request.type === 'stop_recording') {
+    console.log("[mic_helper] 録音停止命令を受信");
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      console.log("[mic_helper] 全てのメディアトラックを停止しました。");
     }
-  });
+    if (recorder && recorder.state === 'recording') {
+      console.log("[mic_helper] recorder.stop() を呼び出します (最終)。");
+      recorder.stop();
+    }
+    if (audioContext) {
+      audioContext.close();
+      console.log("[mic_helper] AudioContextを閉じました。");
+    }
+    window.close();
+  } else if (request.type === 'SET_PAUSE_STATE') {
+    if (vadNode) {
+      const command = request.paused ? 'pause' : 'resume';
+      console.log(`[mic_helper] VADプロセッサに '${command}' コマンドを送信します。`);
+      vadNode.port.postMessage(command);
+    }
+  }
+});
 
 })();

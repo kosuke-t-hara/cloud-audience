@@ -13,6 +13,7 @@ try {
       this._pauseDurationSeconds = (pauseDuration || 3000) / 1000; // ミリ秒を秒に変換
       this._isSilent = false;
       this._silenceStartTime = 0; // 無音開始時間を記録する変数
+      this._isPaused = false; // ★ 一時停止状態
 
       console.log(`[VADProcessor] constructor: 初期化完了。`);
       console.log(`[VADProcessor] > 渡された設定: silenceThreshold=${this._silenceThreshold}, pauseDuration=${this._pauseDurationSeconds}秒`);
@@ -22,11 +23,24 @@ try {
           this._isSilent = false;
           this._silenceStartTime = 0;
           console.log("[VADProcessor] onmessage: 状態をリセットしました。");
+        } else if (event.data === 'pause') {
+          this._isPaused = true;
+          console.log("[VADProcessor] onmessage: 検知を一時停止しました。");
+        } else if (event.data === 'resume') {
+          this._isPaused = false;
+          this._silenceStartTime = 0; // タイマーもリセット
+          this._isSilent = false;
+          console.log("[VADProcessor] onmessage: 検知を再開しました。");
         }
       };
     }
 
     process(inputs, outputs, parameters) {
+      // ★ 一時停止中はすべての処理をスキップ
+      if (this._isPaused) {
+        return true;
+      }
+
       const input = inputs[0];
       if (input && input.length > 0 && input[0].length > 0) {
         const channelData = input[0];

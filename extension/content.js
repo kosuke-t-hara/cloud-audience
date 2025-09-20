@@ -6,6 +6,7 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
   // --- UI要素の管理 ---
   let timerElement = null;
   let speakingIndicator = null;
+  let pauseButton = null; // ★ 一時停止ボタン用の変数を追加
 
   function createUI() {
     // タイマー要素（なければ作成）
@@ -20,6 +21,17 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
       speakingIndicator.id = 'prezento-speaking-indicator';
       document.body.appendChild(speakingIndicator);
     }
+    // ★ 一時停止ボタン（なければ作成）
+    if (!document.getElementById('prezento-pause-button')) {
+      pauseButton = document.createElement('button');
+      pauseButton.id = 'prezento-pause-button';
+      pauseButton.textContent = '発話検知を停止';
+      document.body.appendChild(pauseButton);
+
+      pauseButton.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ type: 'TOGGLE_PAUSE_DETECTION' });
+      });
+    }
   }
 
   function removeUI() {
@@ -30,8 +42,14 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
     const indicator = document.getElementById('prezento-speaking-indicator');
     if (indicator) indicator.remove();
     speakingIndicator = null;
+
+    const button = document.getElementById('prezento-pause-button');
+    if (button) button.remove();
+    pauseButton = null;
     
-    console.log("UI要素を削除しました。");
+    // ★ キーボードショートカットのリスナーも削除
+    document.removeEventListener('keydown', handleShortcut);
+    console.log("UI要素とショートカットリスナーを削除しました。");
   }
 
 
@@ -54,6 +72,15 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
           } else {
             indicator.classList.remove('speaking');
           }
+        }
+        break;
+      
+      // ★ backgroundからの状態変更に応じてボタンのテキストを更新
+      case 'PAUSE_STATE_CHANGED':
+        createUI();
+        const button = document.getElementById('prezento-pause-button');
+        if (button) {
+          button.textContent = request.isPaused ? '発話検知を再開' : '発話検知を停止';
         }
         break;
 
@@ -146,4 +173,18 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
       setTimeout(() => bubble.remove(), 500);
     }, 5000);
   }
+
+  // ★ ショートカットキーのハンドラ
+  function handleShortcut(event) {
+    if (event.ctrlKey && event.shiftKey && event.key === 'P') {
+      event.preventDefault();
+      const button = document.getElementById('prezento-pause-button');
+      if (button) {
+        button.click();
+      }
+    }
+  }
+
+  // ★ ショートカットキーのリスナーを登録
+  document.addEventListener('keydown', handleShortcut);
 }

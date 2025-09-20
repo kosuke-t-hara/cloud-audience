@@ -123,17 +123,17 @@ function stopLoadingAnimation() {
 
 // --- タイムアウト処理 ---
 function handleTimeout() {
-  stopLoadingAnimation();
-  chrome.action.setBadgeText({ text: '' }); // バッジを非表示にする
-  document.getElementById('loading-container').style.display = 'none';
-  document.getElementById('summary-content').style.display = 'none';
-  document.getElementById('error-container').style.display = 'none';
+  // stopLoadingAnimation(); // ★ アニメーションは止めない
+  // document.getElementById('loading-container').style.display = 'none'; // ★ ローディング画面も消さない
   
-  // タイムアウト用のコンテナを表示
+  // タイムアウト用のコンテナを表示するだけにする
   const timeoutContainer = document.getElementById('timeout-container');
   if (timeoutContainer) {
     timeoutContainer.style.display = 'block';
   }
+  
+  // バッジは非表示にする
+  chrome.action.setBadgeText({ text: '' });
 }
 
 
@@ -170,49 +170,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     summaryTimeout = null;
   }
 
-  const loadingContainer = document.getElementById('loading-container');
+  const initialViewContainer = document.getElementById('initial-view-container');
   const errorContainer = document.getElementById('error-container');
   const summaryContent = document.getElementById('summary-content');
-  const timeoutContainer = document.getElementById('timeout-container');
-
-  // 正常な応答があった場合は、タイムアウト表示を確実に非表示にする
-  if (timeoutContainer) {
-    timeoutContainer.style.display = 'none';
-  }
 
   if (request.type === 'show_summary') {
     stopLoadingAnimation();
-    // ローディングを非表示にし、サマリーを表示
-    loadingContainer.style.display = 'none';
+    // 親コンテナを非表示にし、サマリーを表示
+    initialViewContainer.style.display = 'none';
     summaryContent.style.display = 'block';
 
     const mode = request.mode;
     const data = request.data;
 
-    // ★★★ 追加: 練習時間を表示 ★★★
+    // ★★★ ここから復元 ★★★
     if (data.totalTime) {
       const minutes = Math.floor(data.totalTime / 60).toString().padStart(2, '0');
       const seconds = (data.totalTime % 60).toString().padStart(2, '0');
       const timeString = `${minutes}:${seconds}`;
-      // total-time-value のようなIDを持つ要素に時間を設定することを想定
       const timeElement = document.getElementById('total-time-value');
       if (timeElement) {
         timeElement.textContent = timeString;
       }
     }
 
-    // モードに応じて表示を切り替える
     if (mode === 'presenter' || mode === 'creator') {
-      // プレゼンター/クリエイターモードの処理
       document.getElementById('rating-summary').style.display = 'block';
       document.getElementById('totalScoreValue').textContent = data.totalScore;
-      
       document.getElementById('highlight').textContent = data.highlight;
       document.getElementById('advice').textContent = data.advice;
-
       document.getElementById('personaComment').textContent = data.persona_comment;
       
-      // レーダーチャートのラベルをモードに応じて変更
       const labels = (mode === 'presenter')
         ? ['明朗さ', '情熱度', '論理性', '構成力', '自信']
         : ['掴みの強さ', 'エンタメ性', '緩急', 'キラーフレーズ', '安全性'];
@@ -245,10 +233,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         options: { scales: { r: { beginAtZero: true, max: 100 }}}
       });
 
-      // AIからの質問リストを描画
       if (data.questions && data.questions.length > 0) {
         const questionsList = document.getElementById('questions-list-rating');
-        questionsList.innerHTML = ''; // Clear existing
+        questionsList.innerHTML = '';
         data.questions.forEach(question => {
           const li = document.createElement('li');
           li.textContent = question;
@@ -257,13 +244,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
     } else if (mode === 'thinking') {
-      // 思考パートナーモードの処理
       document.getElementById('thinking-summary').style.display = 'block';
-
       document.getElementById('summary-text').textContent = data.summary_text;
       
       const keyPointsList = document.getElementById('key-points-list');
-      keyPointsList.innerHTML = ''; // Clear existing
+      keyPointsList.innerHTML = '';
       data.key_points.forEach(point => {
         const li = document.createElement('li');
         li.textContent = point;
@@ -271,17 +256,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
 
       const newIdeasList = document.getElementById('new-ideas-list');
-      newIdeasList.innerHTML = ''; // Clear existing
+      newIdeasList.innerHTML = '';
       data.new_ideas.forEach(idea => {
         const li = document.createElement('li');
         li.textContent = idea;
         newIdeasList.appendChild(li);
       });
 
-      // AIからの質問リストを描画
       if (data.questions && data.questions.length > 0) {
         const questionsList = document.getElementById('questions-list-thinking');
-        questionsList.innerHTML = ''; // Clear existing
+        questionsList.innerHTML = '';
         data.questions.forEach(question => {
           const li = document.createElement('li');
           li.textContent = question;
@@ -290,38 +274,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     }
 
-    // ★★★ 変更点: アコーディオンロジックを追加 ★★★
     if (data.feedbackHistory && data.feedbackHistory.length > 0) {
       const historyContainer = document.getElementById('feedback-history-container');
       const historyLogContainer = document.getElementById('feedback-history-log');
       const toggleButton = document.getElementById('accordion-toggle-button');
       const contentPanel = document.getElementById('accordion-content-panel');
 
-      // コンテナをクリア
       historyLogContainer.innerHTML = ''; 
-
-      // 履歴データをHTMLに変換して挿入
       data.feedbackHistory.forEach(entry => {
         const entryDiv = document.createElement('div');
         entryDiv.className = 'feedback-entry';
-
         const userP = document.createElement('p');
         userP.className = 'user-transcript';
         userP.textContent = `あなた: ${entry.transcript}`;
-
         const aiP = document.createElement('p');
         aiP.className = 'ai-feedback';
         aiP.textContent = `AI: ${entry.feedback}`;
-
         entryDiv.appendChild(userP);
         entryDiv.appendChild(aiP);
         historyLogContainer.appendChild(entryDiv);
       });
 
-      // 履歴があるので、アコーディオン全体を表示
       historyContainer.style.display = 'block';
-
-      // クリックイベントを設定
       toggleButton.addEventListener('click', () => {
         toggleButton.classList.toggle('active');
         if (contentPanel.style.display === 'block') {
@@ -333,11 +307,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       });
     }
+    // ★★★ ここまで復元 ★★★
 
   } else if (request.type === 'show_summary_error') {
     stopLoadingAnimation();
-    // ローディングを非表示にし、エラーを表示
-    loadingContainer.style.display = 'none';
+    // 親コンテナを非表示にし、エラーを表示
+    initialViewContainer.style.display = 'none';
     errorContainer.style.display = 'block';
     
     let errorMessage = `<h2>サマリーの生成に失敗しました</h2><p>${request.error}</p>`;

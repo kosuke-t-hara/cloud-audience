@@ -150,13 +150,14 @@
     }
 
     /* --- ローディング関連のスタイル --- */
-    #loading-container {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+    #initial-view-container {
       text-align: center;
+      padding-top: 100px; /* 上からのマージン */
+    }
+    #loading-container {
+      /* position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); */ /* 絶対配置を解除 */
       width: 500px; /* 横幅を固定 */
+      margin: 0 auto; /* 中央揃え */
     }
     #loading-message {
       margin-top: 30px; /* スピナーからの距離を調整 */
@@ -171,17 +172,21 @@
 <body>
   <h1>サマリーレポート</h1>
 
-  <div id="loading-container">
-    <div id="loader"></div>
-    <p id="loading-message">レポートの生成を準備しています...</p>
-  </div>
-  <div id="timeout-container" style="display: none; text-align: center; padding: 40px;">
-    <h2>レポートの生成に時間がかかっています</h2>
-    <p>サーバーが混み合っている可能性があります。練習履歴ページから結果をご確認ください。</p>
-    <div class="dashboard-link-container">
-      <a href="https://prezento-ai-coach.web.app/dashboard.html" target="_blank" class="dashboard-link">練習履歴を見る</a>
+  <!-- ★★★ 追加: ローディングとタイムアウトの親コンテナ ★★★ -->
+  <div id="initial-view-container">
+    <div id="loading-container">
+      <div id="loader"></div>
+      <p id="loading-message">レポートの生成を準備しています...</p>
+    </div>
+    <div id="timeout-container" style="display: none; padding: 40px;">
+      <h2>レポートの生成に時間がかかっています</h2>
+      <p>サーバーが混み合っている可能性があります。練習履歴ページから結果をご確認ください。</p>
+      <div class="dashboard-link-container">
+        <a href="https://prezento-ai-coach.web.app/dashboard.html" target="_blank" class="dashboard-link">練習履歴を見る</a>
+      </div>
     </div>
   </div>
+
   <div id="error-container" class="error-message" style="display: none;"></div>
 
   <div id="summary-content" style="display: none;">
