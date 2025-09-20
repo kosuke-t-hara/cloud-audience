@@ -81,6 +81,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // 非同期応答が必要なメッセージタイプを判定
   const needsAsyncResponse = 
     request.type === 'GET_AUTH_STATE' || 
+    request.type === 'SIGN_IN_WITH_TOKEN' ||
     request.action === 'start' || 
     request.action === 'stop';
 
@@ -126,11 +127,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         break;
       case 'SIGN_IN_WITH_TOKEN':
-        const credential = firebase.auth.GoogleAuthProvider.credential(request.idToken);
-        firebase.auth().signInWithCredential(credential)
-          .catch((error) => {
-            console.error("Firebaseへのログインに失敗しました (background):", error);
+        try {
+          const credential = firebase.auth.GoogleAuthProvider.credential(request.idToken);
+          const userCredential = await firebase.auth().signInWithCredential(credential);
+          const user = userCredential.user;
+          currentUser = user; // グローバル変数も更新
+          sendResponse({ 
+            success: true, 
+            user: { 
+              displayName: user.displayName, 
+              email: user.email 
+            } 
           });
+        } catch (error) {
+          console.error("Firebaseへのログインに失敗しました (background):", error);
+          sendResponse({ success: false, error: error.message });
+        }
         break;
       case 'SUMMARY_PAGE_READY':
         const tabId = sender.tab.id;
@@ -199,6 +211,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       case "start":
         startRecording(request.lastMode, request.lastPersona, request.lastFeedbackMode, request.lastFaceAnalysis);
         sendResponse({ message: "練習を開始しました。" });
+        break;
+      case "startMission":
+        startMission(request.missionId, sendResponse);
+        break;
+      case "requestScoring":
+        requestScoring(request.missionId, request.transcript, sendResponse);
         break;
       case "stop":
         stopRecording(sendResponse);
@@ -407,4 +425,81 @@ async function generateSummary(analysisResults, finalConversationSummary, totalT
   };
   
   chrome.tabs.update(summaryTab.id, { active: true });
+}
+
+// --- Mission Mode Functions ---
+
+async function startMission(missionId, sendResponse) {
+  const db = firebase.firestore();
+  try {
+    const missionDoc = await db.collection('missions').doc(missionId).get();
+    if (missionDoc.exists) {
+      const missionData = missionDoc.data();
+      
+      // popup.htmlで設定された最新の設定値を取得
+      const settings = await new Promise((resolve) => {
+        chrome.storage.local.get(['lastFeedbackMode', 'lastFaceAnalysis', 'lastLanguage', 'silenceThreshold', 'pauseDuration'], resolve);
+      });
+
+      // 取得したペルソナと設定で練習を開始
+      startRecording(
+        'mission', // mode
+        missionData.persona, // persona
+        settings.lastFeedbackMode,
+        settings.lastFaceAnalysis
+      );
+      sendResponse({ success: true, message: "ミッションを開始しました。" });
+
+    } else {
+      console.error("Mission not found in Firestore:", missionId);
+      sendResponse({ success: false, error: "指定されたミッションが見つかりません。" });
+    }
+  } catch (error) {
+    console.error("Error starting mission:", error);
+    sendResponse({ success: false, error: "ミッションの開始に失敗しました。" });
+  }
+}
+
+async function requestScoring(missionId, transcript, sendResponse) {
+  const idToken = await getAuthToken();
+  if (!idToken) {
+    sendResponse({ success: false, error: "ログインしていません。" });
+    return;
+  }
+
+  try {
+    const db = firebase.firestore();
+    const missionDoc = await db.collection('missions').doc(missionId).get();
+    if (!missionDoc.exists) {
+      sendResponse({ success: false, error: "ミッションデータが見つかりません。" });
+      return;
+    }
+    const missionData = missionDoc.data();
+    const objective = missionData.objective;
+
+    const response = await fetch(CLOUD_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      },
+      body: JSON.stringify({
+        type: 'mission-scoring',
+        objective: objective,
+        transcript: transcript
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "サーバーから不明なエラー応答" }));
+      throw new Error(errorData.error || `APIエラー: ${response.status}`);
+    }
+
+    const results = await response.json();
+    sendResponse({ success: true, results: results });
+
+  } catch (error) {
+    console.error("Scoring request failed:", error);
+    sendResponse({ success: false, error: error.message });
+  }
 }

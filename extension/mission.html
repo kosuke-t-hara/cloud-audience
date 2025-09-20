@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Mission Mode - Prezento AI Coach</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6750A4;
+            --secondary-color: #E8DEF8;
+            --text-color: #1D1B20;
+            --surface-color: #FEF7FF;
+            --outline-color: #CAC4D0;
+            --body-font: 'Noto Sans JP', sans-serif;
+        }
+        body {
+            font-family: var(--body-font);
+            background-color: var(--surface-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: #fff;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        h1 {
+            font-size: 24px;
+            color: var(--primary-color);
+        }
+        h2 {
+            font-size: 18px;
+            font-weight: 500;
+            border-bottom: 1px solid var(--outline-color);
+            padding-bottom: 8px;
+            margin-top: 24px;
+        }
+        .mission-briefing {
+            background-color: #F3EDF7;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        .mission-briefing p {
+            margin: 8px 0;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        #mission-title {
+            font-weight: 700;
+            font-size: 20px;
+        }
+        .action-area {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .action-area button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            border-radius: 16px;
+            transition: background-color 0.2s;
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .action-area button:disabled {
+            background-color: var(--outline-color);
+            cursor: not-allowed;
+        }
+        .status-panel {
+            text-align: center;
+            font-size: 14px;
+            color: #49454F;
+            height: 20px;
+            margin-bottom: 16px;
+        }
+        .transcript-area {
+            border: 1px solid var(--outline-color);
+            border-radius: 8px;
+            padding: 16px;
+            min-height: 200px;
+            background-color: #fff;
+        }
+        .transcript-area .user {
+            color: #333;
+            text-align: right;
+        }
+        .transcript-area .ai {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+        #results-view {
+            display: none; /* Initially hidden */
+            text-align: center;
+        }
+        #results-view h2 {
+            color: var(--primary-color);
+        }
+        #score {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Mission Mode</h1>
+
+        <!-- Mission Briefing View -->
+        <div id="briefing-view">
+            <h2>ミッションブリーフィング</h2>
+            <div class="mission-briefing">
+                <p id="mission-title">（ミッションタイトルを読み込み中...）</p>
+                <p id="mission-scenario">（シナリオを読み込み中...）</p>
+                <p><strong>クリア条件:</strong> <span id="mission-objective">（クリア条件を読み込み中...）</span></p>
+            </div>
+            <div class="action-area">
+                <button id="start-mission-button">ミッション開始</button>
+            </div>
+        </div>
+
+        <!-- Mission Active View -->
+        <div id="active-view" style="display: none;">
+            <h2>対話ログ</h2>
+            <div class="status-panel">
+                <span id="status-text">待機中...</span>
+            </div>
+            <div class="transcript-area" id="transcript-log">
+                <!-- Transcript will be appended here -->
+            </div>
+        </div>
+
+        <!-- Mission Results View -->
+        <div id="results-view">
+            <h2>ミッション結果</h2>
+            <p id="result-message"></p>
+            <p id="score"></p>
+            <div class="action-area">
+                <button id="show-leaderboard-button">ランキングを見る</button>
+                <button id="retry-mission-button">もう一度挑戦</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./lib/firebase-app.js"></script>
+    <script src="./lib/firebase-auth.js"></script>
+    <script src="./lib/firebase-firestore.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="mission.js"></script>
+</body>
+</html>

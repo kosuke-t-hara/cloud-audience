@@ -236,6 +236,17 @@
   <!-- Logged In View -->
   <div id="logged-in-view" style="display: none;">
     <div class="setting-section">
+      <label class="setting-label">練習モード</label>
+      <div class="segmented-control">
+        <input type="radio" id="practice-mode-free" name="practice_mode" value="free" checked>
+        <label for="practice-mode-free">フリープレイ</label>
+        
+        <input type="radio" id="practice-mode-mission" name="practice_mode" value="mission">
+        <label for="practice-mode-mission">ミッション</label>
+      </div>
+    </div>
+
+    <div class="setting-section">
       <label class="setting-label">役割</label>
       <div class="segmented-control">
         <input type="radio" id="mode-presenter" name="mode" value="presenter" checked>

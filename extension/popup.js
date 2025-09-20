@@ -97,7 +97,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
         // Firebaseへのログイン処理はバックグラウンドに任せる
-        chrome.runtime.sendMessage({ type: 'SIGN_IN_WITH_TOKEN', idToken: idToken });
+        chrome.runtime.sendMessage({ type: 'SIGN_IN_WITH_TOKEN', idToken: idToken }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error("ログイン処理中にエラー:", chrome.runtime.lastError.message);
+            return;
+          }
+          if (response && response.success) {
+            // ログイン成功の応答を受け取ったら、UIを即時更新
+            updateUI(response.user);
+          } else {
+            console.error("バックグラウンドでのログインに失敗しました:", response?.error);
+          }
+        });
         // auth.signInWithCredential(credential)
         //   .catch((error) => {
         //     console.error("Firebaseへのログインに失敗しました:", error);
@@ -180,6 +191,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // --- 開始ボタンのイベントリスナー ---
   startButton.addEventListener('click', () => {
+    const practiceMode = document.querySelector('input[name="practice_mode"]:checked').value;
+
     const settings = {
       lastLanguage: document.querySelector('input[name="language"]:checked').value,
       lastMode: document.querySelector('input[name="mode"]:checked').value,
@@ -191,16 +204,24 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     chrome.storage.local.set(settings).then(() => {
-      chrome.runtime.sendMessage({
-        action: "start",
-        ...settings
-      }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error(chrome.runtime.lastError.message);
-        } else {
-          console.log(response?.message);
-        }
-      });
+      if (practiceMode === 'free') {
+        // フリープレイの場合：既存の処理
+        chrome.runtime.sendMessage({
+          action: "start",
+          ...settings
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError.message);
+          } else {
+            console.log(response?.message);
+          }
+        });
+      } else if (practiceMode === 'mission') {
+        // ミッションモードの場合：新しいタブを開く
+        const missionUrl = chrome.runtime.getURL('mission.html?mission_id=reconcile_with_ai_01');
+        chrome.tabs.create({ url: missionUrl });
+        window.close(); // ポップアップを閉じる
+      }
     });
   });
 
