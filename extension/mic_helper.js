@@ -176,10 +176,21 @@ chrome.runtime.onMessage.addListener((request) => {
     }
     window.close();
   } else if (request.type === 'SET_PAUSE_STATE') {
+    // VADプロセッサの制御
     if (vadNode) {
       const command = request.paused ? 'pause' : 'resume';
       console.log(`[mic_helper] VADプロセッサに '${command}' コマンドを送信します。`);
       vadNode.port.postMessage(command);
+    }
+    // ★★★ MediaRecorderの制御を追加 ★★★
+    if (recorder) {
+      if (request.paused && recorder.state === 'recording') {
+        recorder.pause();
+        console.log(`[mic_helper] MediaRecorderを一時停止しました。状態: ${recorder.state}`);
+      } else if (!request.paused && recorder.state === 'paused') {
+        recorder.resume();
+        console.log(`[mic_helper] MediaRecorderを再開しました。状態: ${recorder.state}`);
+      }
     }
   }
 });

@@ -352,8 +352,13 @@ async function getGeminiSummary(combinedResults, sentiment, mode, persona, conve
   }
 }
 
-async function getGeminiMissionScore(objective, transcript) {
+async function getGeminiMissionScore(objective, conversationLog) {
   const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GEMINI_API_KEY}`;
+
+  // ★★★ 変更: 構造化ログを整形してプロンプトに含める ★★★
+  const formattedLog = conversationLog.map(entry => {
+    return `${entry.speaker === 'user' ? 'ユーザー' : 'AI'}: ${entry.text}`;
+  }).join('\n');
 
   const prompt = `
     あなたは、対話シミュレーションの採点を行う厳格な審査員です。
@@ -363,12 +368,12 @@ async function getGeminiMissionScore(objective, transcript) {
     ${objective}
 
     # 対話ログ
-    ${transcript}
+    ${formattedLog}
 
     # あなたのタスク
     1.  **成否判定 (success):** 対話ログの内容が「ミッションのクリア条件」を明確に満たしているかを判断し、trueかfalseで回答してください。
-    2.  **スコア (score):** ミッションの達成度を0から100の整数で採点してください。クリア条件を完全に満たしていれば100点です。部分的に達成している場合は、その度合いに応じて点数をつけてください。失敗している場合は40点以下となります。
-    3.  **総評 (message):** この対話の良かった点と、次にもっと良くするためのアドバイスを、合わせて200字以内の短い文章で生成してください。
+    2.  **スコア (score):** ミッションの達成度を0から100の整数で採点してください。クリア条件を完全に満たしているだけでなく、AIの応答に的確に反応し、対話の流れをゴールに向けて円滑に導けているかを評価してください。失敗している場合は40点以下となります。
+    3.  **総評 (message):** この対話の良かった点と、次にもっと良くするためのアドバイスを、AIとのやり取りも踏まえて、合わせて200字以内の短い文章で生成してください。
 
     # 出力形式 (必ずこのJSON形式で出力してください)
     {
@@ -467,9 +472,9 @@ functions.http('coachApi', async (req, res) => {
     const transcript = analysisData ? analysisData.fullTranscript : null;
     const geminiResult = await getGeminiVisionFeedback(transcript, imageContent, mode, history || [], facialFeedback, persona, conversationSummary);
 
-    res.status(200).send({ 
-      transcript, 
-      feedback: geminiResult ? geminiResult.feedback : null, 
+    res.status(200).send({
+      transcript,
+      feedback: geminiResult ? geminiResult.feedback : null,
       analysisData,
       newConversationSummary: geminiResult ? geminiResult.newSummary : conversationSummary
     });
@@ -503,13 +508,13 @@ functions.http('coachApi', async (req, res) => {
             feedbackHistory: feedbackHistory || [],
             createdAt: admin.firestore.FieldValue.serverTimestamp()
           };
-          
+
           // 【診断】書き込む直前のデータをログに出力
           console.log("Attempting to save to Firestore:", JSON.stringify(sessionData, null, 2));
 
           const docRef = await db.collection('users').doc(userId).collection('sessions').add(sessionData);
           console.log('Practice session saved to Firestore with ID:', docRef.id);
-          
+
           res.status(200).send({ ...summaryResult.data, totalTime: totalTime });
 
         } catch (error) {
@@ -520,11 +525,12 @@ functions.http('coachApi', async (req, res) => {
       res.status(500).send({ error: "サマリーの生成に失敗しました。", details: summaryResult.error, rawDetails: summaryResult.details });
     }
   } else if (type === 'mission-scoring') {
-    const { objective, transcript } = req.body;
-    if (!objective || !transcript) {
-      return res.status(400).send('Bad Request: objective and transcript are required.');
+    // ★★★ 変更: transcriptの代わりにconversationLogを受け取る ★★★
+    const { objective, conversationLog } = req.body;
+    if (!objective || !conversationLog || !Array.isArray(conversationLog)) {
+      return res.status(400).send('Bad Request: objective and conversationLog (array) are required.');
     }
-    const scoringResult = await getGeminiMissionScore(objective, transcript);
+    const scoringResult = await getGeminiMissionScore(objective, conversationLog);
     if (scoringResult.success) {
       res.status(200).send(scoringResult.data);
     } else {
@@ -536,7 +542,7 @@ functions.http('coachApi', async (req, res) => {
                                .orderBy('createdAt', 'desc')
                                .limit(20)
                                .get();
-      
+
       if (snapshot.empty) {
         res.status(200).send([]);
         return;
@@ -560,7 +566,6 @@ functions.http('coachApi', async (req, res) => {
     res.status(400).send('Invalid request type');
   }
 });
-
 // Speech-to-Text関数
 async function transcribeAudio(audioContent) {
   try {

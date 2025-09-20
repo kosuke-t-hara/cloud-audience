@@ -75,12 +75,20 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
         }
         break;
       
-      // ★ backgroundからの状態変更に応じてボタンのテキストを更新
+      // ★ backgroundからの状態変更に応じてボタンのテキストとインジケーターの色を更新
       case 'PAUSE_STATE_CHANGED':
         createUI();
         const button = document.getElementById('prezento-pause-button');
         if (button) {
           button.textContent = request.isPaused ? '発話検知を再開' : '発話検知を停止';
+        }
+        const paused_indicator = document.getElementById('prezento-speaking-indicator');
+        if (paused_indicator) {
+          if (request.isPaused) {
+            paused_indicator.classList.add('paused');
+          } else {
+            paused_indicator.classList.remove('paused');
+          }
         }
         break;
 

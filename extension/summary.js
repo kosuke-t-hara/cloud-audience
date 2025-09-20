@@ -140,9 +140,9 @@ function handleTimeout() {
 // --- 初期化処理 ---
 document.addEventListener('DOMContentLoaded', () => {
   startLoadingAnimation();
-  
-  // 15秒後にタイムアウト処理を実行するタイマーを設定
-  summaryTimeout = setTimeout(handleTimeout, 15000);
+
+  // 20秒後にタイムアウト処理を実行するタイマーを設定
+  summaryTimeout = setTimeout(handleTimeout, 20000);
 
   // サマリーページの準備ができたことをバックグラウンドに通知
   chrome.runtime.sendMessage({ type: 'SUMMARY_PAGE_READY' });

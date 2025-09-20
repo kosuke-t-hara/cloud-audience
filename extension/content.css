@@ -63,6 +63,13 @@
   animation: pulse 1.5s infinite;
 }
 
+/* ★★★ 追加: 一時停止時のインジケータースタイル ★★★ */
+#prezento-speaking-indicator.paused {
+  background-color: #4CAF50; /* 緑色 */
+  /* speakingクラスのアニメーションを上書き */
+  animation: pulse-paused 2s infinite; 
+}
+
 @keyframes pulse {
   0% {
     transform: scale(1);
@@ -75,6 +82,22 @@
   100% {
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
+  }
+}
+
+/* ★★★ 追加: 一時停止時のアニメーション ★★★ */
+@keyframes pulse-paused {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 10px 20px rgba(76, 175, 80, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
   }
 }
 

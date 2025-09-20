@@ -139,22 +139,38 @@ document.addEventListener('DOMContentLoaded', () => {
         finishMissionButton.disabled = true; // ボタンを無効化
         statusText.textContent = 'ミッション完了！結果を計算しています...';
         
-        // background.jsにスコアリングを依頼する
-        const fullTranscript = transcriptLog.innerText;
-        chrome.runtime.sendMessage({ 
-            action: "requestScoring", 
-            missionId: currentMissionId,
-            transcript: fullTranscript 
-        }, (response) => {
+        // ★★★ 変更: stopメッセージの完了後にスコアリングを依頼 ★★★
+        chrome.runtime.sendMessage({ action: "stop" }, () => {
             if (chrome.runtime.lastError) {
-                console.error(chrome.runtime.lastError.message);
-                displayResults({ success: false, message: 'スコアの計算中にエラーが発生しました。', score: 0 });
-            } else if (!response.success) {
-                console.error('Scoring failed:', response.error);
-                displayResults({ success: false, message: `スコア計算エラー: ${response.error}`, score: 0 });
-            } else {
-                displayResults(response.results);
+                console.error("Stop command failed:", chrome.runtime.lastError.message);
             }
+            
+            // 構造化された対話ログを生成
+            const conversationLog = [];
+            transcriptLog.querySelectorAll('p').forEach(p => {
+                conversationLog.push({
+                    speaker: p.classList.contains('user') ? 'user' : 'ai',
+                    text: p.textContent
+                });
+            });
+            
+            const objectiveText = missionObjective.textContent;
+            chrome.runtime.sendMessage({ 
+                action: "requestScoring", 
+                missionId: currentMissionId,
+                conversationLog: conversationLog,
+                objective: objectiveText
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error(chrome.runtime.lastError.message);
+                    displayResults({ success: false, message: 'スコアの計算中にエラーが発生しました。', score: 0 });
+                } else if (!response.success) {
+                    console.error('Scoring failed:', response.error);
+                    displayResults({ success: false, message: `スコア計算エラー: ${response.error}`, score: 0 });
+                } else {
+                    displayResults(response.results);
+                }
+            });
         });
     }
 
