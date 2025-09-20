@@ -22,10 +22,38 @@ document.addEventListener('DOMContentLoaded', function () {
   const accordionToggle = document.querySelector('.accordion-toggle');
   const accordionContent = document.querySelector('.accordion-content');
 
+  // --- ★★★ 追加: 練習モード関連の要素 ★★★ ---
+  const practiceModeRadios = document.querySelectorAll('input[name="practice_mode"]');
+  const roleSelectionSection = document.getElementById('role-selection-section');
+  const feedbackMethodSection = document.getElementById('feedback-method-section');
+  const advancedSettingsAccordion = document.getElementById('advanced-settings-accordion');
+  const faceAnalysisSection = document.getElementById('face-analysis-section');
+
   // --- Firebaseの初期化 ---
   const app = firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore(); // Firestoreを初期化
+
+  // --- ★★★ 変更: 練習モードに応じて設定項目を切り替える関数 ★★★ ---
+  function togglePracticeSettings() {
+    const selectedPracticeMode = document.querySelector('input[name="practice_mode"]:checked').value;
+    const isMissionMode = selectedPracticeMode === 'mission';
+
+    // 練習モードに応じて、アコーディオン外の項目を非表示/表示
+    roleSelectionSection.style.display = isMissionMode ? 'none' : 'block';
+    feedbackMethodSection.style.display = isMissionMode ? 'none' : 'block';
+
+    // 練習モードに応じて、アコーディオン内の項目を非表示/表示
+    faceAnalysisSection.style.display = isMissionMode ? 'none' : 'block';
+
+    // ペルソナ設定は、ミッションモードでは常に非表示。フリープレイモードでは役割設定に依存する。
+    if (isMissionMode) {
+      personaInputSection.style.display = 'none';
+    } else {
+      // フリープレイモードに戻った際は、役割設定に応じた表示状態を再評価する
+      togglePersonaInput();
+    }
+  }
 
   // --- UI更新関数 ---
   function updateUI(user) {
@@ -139,8 +167,22 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
+  // --- ★★★ 追加: 練習モードのラジオボタンにイベントリスナーを設定 ★★★ ---
+  practiceModeRadios.forEach(radio => {
+    radio.addEventListener('change', togglePracticeSettings);
+  });
+
   // --- ペルソナ入力欄の表示/非表示ロジック ---
   function togglePersonaInput() {
+    const selectedPracticeMode = document.querySelector('input[name="practice_mode"]:checked').value;
+    
+    // ミッションモードの場合は、役割に関わらず常に非表示
+    if (selectedPracticeMode === 'mission') {
+      personaInputSection.style.display = 'none';
+      return;
+    }
+
+    // フリープレイモードの場合、役割に応じて表示を切り替え
     const selectedMode = document.querySelector('input[name="mode"]:checked').value;
     personaInputSection.style.display = (selectedMode === 'presenter' || selectedMode === 'thinking') ? 'block' : 'none';
   }
@@ -153,13 +195,18 @@ document.addEventListener('DOMContentLoaded', function () {
   function loadSettings() {
     chrome.storage.local.get([
       'lastLanguage', 'lastMode', 'lastPersona', 'lastFeedbackMode',
-      'lastFaceAnalysis', 'silenceThreshold', 'pauseDuration'
+      'lastFaceAnalysis', 'silenceThreshold', 'pauseDuration',
+      'lastPracticeMode' // ★★★ 追加: 練習モードを読み込む ★★★
     ], (result) => {
       if (result.lastLanguage) document.querySelector(`input[name="language"][value="${result.lastLanguage}"]`).checked = true;
       if (result.lastMode) document.querySelector(`input[name="mode"][value="${result.lastMode}"]`).checked = true;
       if (result.lastPersona) personaText.value = result.lastPersona;
       if (result.lastFeedbackMode) document.querySelector(`input[name="feedback_mode"][value="${result.lastFeedbackMode}"]`).checked = true;
       if (result.lastFaceAnalysis) document.querySelector(`input[name="face_analysis"][value="${result.lastFaceAnalysis}"]`).checked = true;
+      // ★★★ 追加: 練習モードを設定し、UIを更新 ★★★
+      if (result.lastPracticeMode) {
+        document.querySelector(`input[name="practice_mode"][value="${result.lastPracticeMode}"]`).checked = true;
+      }
 
       const silenceThreshold = result.silenceThreshold !== undefined ? parseFloat(result.silenceThreshold) : 0.02;
       thresholdSlider.value = silenceThreshold;
@@ -170,6 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
       pauseDurationValueSpan.textContent = pauseDuration;
 
       togglePersonaInput();
+      togglePracticeSettings(); // ★★★ 追加: 初期表示時にも設定を反映 ★★★
     });
   }
 
@@ -191,6 +239,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const practiceMode = document.querySelector('input[name="practice_mode"]:checked').value;
 
     const settings = {
+      lastPracticeMode: practiceMode, // ★★★ 追加: 練習モードを保存 ★★★
       lastLanguage: document.querySelector('input[name="language"]:checked').value,
       lastMode: document.querySelector('input[name="mode"]:checked').value,
       lastPersona: (document.querySelector('input[name="mode"]:checked').value === 'presenter' || document.querySelector('input[name="mode"]:checked').value === 'thinking') ? personaText.value : null,

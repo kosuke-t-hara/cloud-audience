@@ -236,7 +236,7 @@
   <!-- Logged In View -->
   <div id="logged-in-view" style="display: none;">
     <div class="setting-section">
-      <label class="setting-label">練習モード</label>
+      <label class="setting-label">モード</label>
       <div class="segmented-control">
         <input type="radio" id="practice-mode-free" name="practice_mode" value="free" checked>
         <label for="practice-mode-free">フリープレイ</label>
@@ -246,7 +246,7 @@
       </div>
     </div>
 
-    <div class="setting-section">
+    <div id="role-selection-section" class="setting-section">
       <label class="setting-label">役割</label>
       <div class="segmented-control">
         <input type="radio" id="mode-presenter" name="mode" value="presenter" checked>
@@ -257,7 +257,7 @@
       </div>
     </div>
   
-    <div class="setting-section">
+    <div id="feedback-method-section" class="setting-section">
       <label class="setting-label">フィードバック方法</label>
       <div class="segmented-control">
         <input type="radio" id="fb-realtime" name="feedback_mode" value="realtime" checked>
@@ -269,7 +269,7 @@
       </div>
     </div>
   
-    <button type="button" class="accordion-toggle">詳細設定</button>
+    <button type="button" id="advanced-settings-accordion" class="accordion-toggle">詳細設定</button>
     <div class="accordion-content">
       <div id="persona-input-section" class="setting-section" style="display: none;">
         <label for="persona-text" class="setting-label">ペルソナ設定（任意）</label>
@@ -286,7 +286,7 @@
         </div>
       </div>
   
-      <div class="setting-section">
+      <div id="face-analysis-section" class="setting-section">
         <label class="setting-label">表情分析</label>
         <div class="segmented-control">
           <input type="radio" id="face-analysis-on" name="face_analysis" value="on" checked>
@@ -299,8 +299,8 @@
       <div class="setting-section">
         <label for="silence-threshold-slider" class="setting-label">マイク感度調整</label>
         <div class="slider-container">
-          <input type="range" id="silence-threshold-slider" min="0.005" max="1.0" step="0.020" value="0.02">
-          <span id="silence-threshold-value">0.020</span>
+          <input type="range" id="silence-threshold-slider" min="0.005" max="1.0" step="0.020" value="0.2">
+          <span id="silence-threshold-value">0.2</span>
         </div>
       </div>
   

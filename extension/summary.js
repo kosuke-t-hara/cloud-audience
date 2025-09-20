@@ -124,6 +124,7 @@ function stopLoadingAnimation() {
 // --- タイムアウト処理 ---
 function handleTimeout() {
   stopLoadingAnimation();
+  chrome.action.setBadgeText({ text: '' }); // バッジを非表示にする
   document.getElementById('loading-container').style.display = 'none';
   document.getElementById('summary-content').style.display = 'none';
   document.getElementById('error-container').style.display = 'none';
