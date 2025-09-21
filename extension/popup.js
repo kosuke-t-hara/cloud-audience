@@ -46,6 +46,17 @@ document.addEventListener('DOMContentLoaded', function () {
     // 練習モードに応じて、アコーディオン内の項目を非表示/表示
     faceAnalysisSection.style.display = isMissionMode ? 'none' : 'block';
 
+    // ★★★ ボタンの表示を切り替えるロジックを追加 ★★★
+    if (isMissionMode) {
+      startButton.textContent = '運命に挑む';
+      startButton.classList.add('btn-danger');
+      stopButton.style.display = 'none';
+    } else {
+      startButton.textContent = '練習を開始';
+      startButton.classList.remove('btn-danger');
+      stopButton.style.display = 'block';
+    }
+
     // ペルソナ設定は、ミッションモードでは常に非表示。フリープレイモードでは役割設定に依存する。
     if (isMissionMode) {
       personaInputSection.style.display = 'none';

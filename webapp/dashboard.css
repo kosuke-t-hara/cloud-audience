@@ -109,6 +109,8 @@
     gap: 1rem;
     max-width: 600px;
     margin: 0 auto;
+    max-height: 600px;
+    overflow-y: auto;
 }
 
 .activity-card {
@@ -206,6 +208,8 @@
     list-style: none;
     padding: 0;
     margin: 0;
+    max-height: 600px;
+    overflow-y: auto;
 }
 
 .ranking-item {

@@ -31,6 +31,8 @@ let sessionFeedbackHistory = [];
 let consecutiveFailures = 0;
 let timerInterval = null;
 let elapsedTimeInSeconds = 0;
+let missionRemainingSeconds = null; // ★ 追加
+let missionTimerInterval = null; // ★ 追加
 const pendingSummaries = {};
 let isDetectionPaused = false; // ★ 発話検知の一時停止状態
 
@@ -254,6 +256,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             currentSettings.lastFaceAnalysis,
             targetTabId // 保存しておいたタブIDを渡す
           );
+
+          // ★★★ 制限時間タイマーを開始 ★★★
+          const timeLimit = request.timeLimit;
+          if (timeLimit && timeLimit > 0) {
+            missionRemainingSeconds = timeLimit;
+            missionTimerInterval = setInterval(() => {
+              missionRemainingSeconds--;
+              if (targetTabId) {
+                chrome.tabs.sendMessage(targetTabId, { type: 'MISSION_TIMER_UPDATE', remainingTime: missionRemainingSeconds });
+              }
+
+              if (missionRemainingSeconds <= 0) {
+                clearInterval(missionTimerInterval);
+                missionTimerInterval = null;
+                if (targetTabId) {
+                  chrome.tabs.sendMessage(targetTabId, { type: 'FORCE_FINISH_MISSION' });
+                }
+              }
+            }, 1000);
+          }
+          // ★★★ ここまで ★★★
+
           sendResponse({ success: true, message: "ミッションの音声を記録開始しました。" });
         } else {
           console.error("ミッションの音声記録を開始できませんでした。モードまたはタブIDが無効です。");
@@ -277,6 +301,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             },
             body: JSON.stringify({
               type: 'mission-scoring',
+              missionId: request.missionId,
               objective: request.objective,
               conversationLog: request.conversationLog // ★ transcriptをconversationLogに変更
             })
@@ -382,6 +407,10 @@ function stopRecording() { // sendResponseCallback を削除
   
   clearInterval(timerInterval);
   timerInterval = null;
+
+  // ★★★ ミッションタイマーも停止 ★★★
+  clearInterval(missionTimerInterval);
+  missionTimerInterval = null;
   
   // アラームをクリア
   chrome.alarms.clear('oneMinuteTimer');
@@ -394,7 +423,7 @@ function stopRecording() { // sendResponseCallback を削除
   }
 
   if (currentMode !== 'mission') {
-    // stopRecordingは非同期でなくなったので、sendResponseCallbackを渡さない
+    // stopRecordingは非同期でなくなったので,sendResponseCallbackを渡さない
     generateSummary(sessionAnalysisResults, conversationSummary, elapsedTimeInSeconds, sessionFeedbackHistory);
   }
 }
@@ -567,19 +596,31 @@ async function startMission(missionId, sendResponse) {
       // ミッションページを開き、そのタブIDを保存
       const missionUrl = chrome.runtime.getURL(`mission.html?mission_id=${missionId}`);
       chrome.tabs.create({ url: missionUrl }, (tab) => {
-        targetTabId = tab.id; // ★ targetTabId を設定
+        
+        // ★★★ 修正: タブの読み込み完了を待ってからスクリプトを注入する ★★★
+        const listener = (tabId, changeInfo, updatedTab) => {
+          if (tabId === tab.id && changeInfo.status === 'complete') {
+            // targetTabId をここで設定
+            targetTabId = tab.id;
 
-        // popup.htmlで設定された最新の設定値を取得
-        chrome.storage.local.get(['lastFeedbackMode', 'lastFaceAnalysis'], (settings) => {
-          // 取得したペルソナと設定で練習を開始
-          startRecording(
-            'mission', // mode
-            missionData.persona, // persona
-            settings.lastFeedbackMode,
-            settings.lastFaceAnalysis
-          );
-          sendResponse({ success: true, message: "ミッションを開始しました。" });
-        });
+            // popup.htmlで設定された最新の設定値を取得
+            chrome.storage.local.get(['lastFeedbackMode', 'lastFaceAnalysis'], (settings) => {
+              // 取得したペルソナと設定で練習を開始
+              startRecording(
+                'mission', // mode
+                missionData.persona, // persona
+                settings.lastFeedbackMode,
+                settings.lastFaceAnalysis,
+                tab.id // ★★★ 明示的にタブIDを渡す ★★★
+              );
+              sendResponse({ success: true, message: "ミッションを開始しました。" });
+            });
+
+            // 一度実行したらリスナーを削除する
+            chrome.tabs.onUpdated.removeListener(listener);
+          }
+        };
+        chrome.tabs.onUpdated.addListener(listener);
       });
 
     } else {

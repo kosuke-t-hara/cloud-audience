@@ -21,9 +21,16 @@
   transform: translateY(0);
 }
 
+/* content.css */
+
+#prezento-ui-container {
+    position: fixed;
+    z-index: 9999;
+}
+
 #prezento-ai-coach-timer {
-  position: fixed;
-  bottom: 20px;
+    position: fixed;
+    bottom: 20px;
   right: 20px;
   background-color: rgba(0, 0, 0, 0.7);
   color: white;

@@ -7,11 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const missionTitle = document.getElementById('mission-title');
     const missionScenario = document.getElementById('mission-scenario');
     const missionObjective = document.getElementById('mission-objective');
+    const missionTimeLimit = document.getElementById('mission-time-limit'); // ★ 修正
     const startMissionButton = document.getElementById('start-mission-button');
     const finishMissionButton = document.getElementById('finish-mission-button');
 
     const statusText = document.getElementById('status-text');
     const transcriptLog = document.getElementById('transcript-log');
+    const missionTimer = document.getElementById('mission-timer'); // ★ 修正
 
     const resultMessage = document.getElementById('result-message');
     const scoreDisplay = document.getElementById('score');
@@ -25,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentMissionId = null;
     let currentUser = null;
+    let timeLimitSeconds = 0; // ★ 修正
 
     // --- 初期化処理 ---
     function init() {
@@ -60,6 +63,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 missionTitle.textContent = missionData.title || '無題のミッション';
                 missionScenario.textContent = missionData.scenario || 'シナリオの説明がありません。';
                 missionObjective.textContent = missionData.objective || 'クリア条件が設定されていません。';
+                
+                // ★★★ 制限時間に関する処理 ★★★
+                timeLimitSeconds = missionData.timeLimitSeconds || 0;
+                if (timeLimitSeconds > 0) {
+                    const minutes = Math.floor(timeLimitSeconds / 60);
+                    const seconds = timeLimitSeconds % 60;
+                    missionTimeLimit.textContent = `${minutes}分${seconds}秒`;
+                    missionTimer.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                } else {
+                    missionTimeLimit.textContent = '無制限';
+                    missionTimer.textContent = '∞';
+                }
+
             } else {
                 console.error('Mission not found in Firestore.');
                 missionTitle.textContent = 'エラー: ミッションが見つかりません。';
@@ -90,7 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // background.jsに音声記録の開始を通知する
         chrome.runtime.sendMessage({
-            action: "startMissionAudio"
+            action: "startMissionAudio",
+            timeLimit: timeLimitSeconds // ★ 修正
         }, (response) => {
             if (chrome.runtime.lastError) {
                 console.error(chrome.runtime.lastError.message);
@@ -131,6 +148,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             case 'STATUS_UPDATE':
                 statusText.textContent = request.status;
+                break;
+            case 'MISSION_TIMER_UPDATE': // ★ 修正
+                const minutes = Math.floor(request.remainingTime / 60);
+                const seconds = request.remainingTime % 60;
+                missionTimer.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                break;
+            case 'FORCE_FINISH_MISSION': // ★ 修正
+                statusText.textContent = '時間切れ！';
+                finishMission();
                 break;
             case 'MISSION_COMPLETE': // background.js側でミッション完了を検知した場合
                 finishMission();

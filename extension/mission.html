@@ -83,6 +83,30 @@
             background-color: var(--outline-color);
             cursor: not-allowed;
         }
+        .btn-danger {
+            background-color: #D32F2F !important; /* 強い赤色 */
+            color: white !important;
+        }
+        .btn-danger:hover {
+            opacity: 0.8 !important;
+        }
+        @keyframes unsettling-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7);
+                opacity: 0.9;
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(211, 47, 47, 0);
+                opacity: 1;
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(211, 47, 47, 0);
+                opacity: 0.9;
+            }
+        }
+        .btn-danger {
+            animation: unsettling-pulse 2s infinite;
+        }
         .status-panel {
             text-align: center;
             font-size: 14px;
@@ -96,6 +120,8 @@
             padding: 16px;
             min-height: 200px;
             background-color: #fff;
+            max-height: 400px;
+            overflow-y: auto;
         }
         .transcript-area .user {
             color: #333;
@@ -134,9 +160,10 @@
                 <p id="mission-title">（ミッションタイトルを読み込み中...）</p>
                 <p id="mission-scenario">（シナリオを読み込み中...）</p>
                 <p><strong>クリア条件:</strong> <span id="mission-objective">（クリア条件を読み込み中...）</span></p>
+                <p><strong>制限時間:</strong> <span id="mission-time-limit">（制限時間を読み込み中...）</span></p>
             </div>
             <div class="action-area">
-                <button id="start-mission-button">ミッション開始</button>
+                <button id="start-mission-button" class="btn-danger">ミッション開始</button>
             </div>
         </div>
 
@@ -145,6 +172,7 @@
             <h2>対話ログ</h2>
             <div class="status-panel">
                 <span id="status-text">待機中...</span>
+                <span id="mission-timer">--:--</span>
             </div>
             <div class="transcript-area" id="transcript-log">
                 <!-- Transcript will be appended here -->

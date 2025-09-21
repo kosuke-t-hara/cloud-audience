@@ -4,29 +4,36 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
   console.log("Prezento AI Coachのコンテントスクリプトが注入されました。");
 
   // --- UI要素の管理 ---
-  let timerElement = null;
-  let speakingIndicator = null;
-  let pauseButton = null; // ★ 一時停止ボタン用の変数を追加
+  let uiContainer = null;
 
   function createUI() {
+    // 親コンテナ（なければ作成）
+    if (!document.getElementById('prezento-ui-container')) {
+      uiContainer = document.createElement('div');
+      uiContainer.id = 'prezento-ui-container';
+      document.body.appendChild(uiContainer);
+    } else {
+      uiContainer = document.getElementById('prezento-ui-container');
+    }
+
     // タイマー要素（なければ作成）
     if (!document.getElementById('prezento-ai-coach-timer')) {
-      timerElement = document.createElement('div');
+      const timerElement = document.createElement('div');
       timerElement.id = 'prezento-ai-coach-timer';
-      document.body.appendChild(timerElement);
+      uiContainer.appendChild(timerElement);
     }
     // 発話インジケーター要素（なければ作成）
     if (!document.getElementById('prezento-speaking-indicator')) {
-      speakingIndicator = document.createElement('div');
+      const speakingIndicator = document.createElement('div');
       speakingIndicator.id = 'prezento-speaking-indicator';
-      document.body.appendChild(speakingIndicator);
+      uiContainer.appendChild(speakingIndicator);
     }
     // ★ 一時停止ボタン（なければ作成）
     if (!document.getElementById('prezento-pause-button')) {
-      pauseButton = document.createElement('button');
+      const pauseButton = document.createElement('button');
       pauseButton.id = 'prezento-pause-button';
       pauseButton.textContent = '発話検知を停止';
-      document.body.appendChild(pauseButton);
+      uiContainer.appendChild(pauseButton);
 
       pauseButton.addEventListener('click', () => {
         chrome.runtime.sendMessage({ type: 'TOGGLE_PAUSE_DETECTION' });
@@ -35,17 +42,9 @@ if (typeof window.isPrezentoScriptInjected === 'undefined') {
   }
 
   function removeUI() {
-    const timer = document.getElementById('prezento-ai-coach-timer');
-    if (timer) timer.remove();
-    timerElement = null;
-
-    const indicator = document.getElementById('prezento-speaking-indicator');
-    if (indicator) indicator.remove();
-    speakingIndicator = null;
-
-    const button = document.getElementById('prezento-pause-button');
-    if (button) button.remove();
-    pauseButton = null;
+    const container = document.getElementById('prezento-ui-container');
+    if (container) container.remove();
+    uiContainer = null;
     
     // ★ キーボードショートカットのリスナーも削除
     document.removeEventListener('keydown', handleShortcut);
