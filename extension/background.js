@@ -330,6 +330,12 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis, tabId = null)
     }
   }, 1000);
 
+  // 1分ごとにアラームを設定
+  chrome.alarms.create('oneMinuteTimer', {
+    delayInMinutes: 1,
+    periodInMinutes: 1
+  });
+
   chrome.action.setBadgeText({ text: 'REC' });
   chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
 
@@ -375,6 +381,9 @@ function stopRecording() { // sendResponseCallback を削除
   
   clearInterval(timerInterval);
   timerInterval = null;
+  
+  // アラームをクリア
+  chrome.alarms.clear('oneMinuteTimer');
   
   targetTabId = null;
 
@@ -625,3 +634,25 @@ async function requestScoring(missionId, transcript, sendResponse) {
     sendResponse({ success: false, error: error.message });
   }
 }
+
+// --- 1分経過通知機能 ---
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'oneMinuteTimer') {
+    // 経過時間を取得 (elapsedTimeInSeconds はグローバル変数として存在)
+    const minutes = Math.floor(elapsedTimeInSeconds / 60);
+    
+    // 0分の場合は通知しない（開始直後の誤爆防止）
+    if (minutes === 0) {
+      return;
+    }
+
+    // 通知を作成
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'images/icon128.png',
+      title: 'Prezento AI Coach',
+      message: `${minutes}分が経過しました。`,
+      priority: 2
+    });
+  }
+});
