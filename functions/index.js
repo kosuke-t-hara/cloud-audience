@@ -442,6 +442,7 @@ functions.http('coachApi', async (req, res) => {
   // --- ここから下は、元々corsのコールバック内にあったコード ---
   const { type, mode, history, persona } = req.body;
   let userId = null;
+  let decodedToken = null;
 
   // --- 認証チェック ---
   const needsAuth = ['summary-report', 'get-history', 'realtime-feedback', 'mission-scoring'];
@@ -452,7 +453,7 @@ functions.http('coachApi', async (req, res) => {
     }
     const idToken = authHeader.split('Bearer ')[1];
     try {
-      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      decodedToken = await admin.auth().verifyIdToken(idToken);
       userId = decodedToken.uid;
       console.log('Authenticated user:', userId);
     } catch (error) {
@@ -532,40 +533,95 @@ functions.http('coachApi', async (req, res) => {
     }
     const scoringResult = await getGeminiMissionScore(objective, conversationLog);
     if (scoringResult.success) {
+      try {
+        const { missionId } = req.body;
+        const newScore = scoringResult.data.score;
+        const highScoreRef = db.collection('mission_high_scores').doc(`${missionId}_${userId}`);
+        const historyRef = db.collection('mission_results').doc();
+
+        await db.runTransaction(async (transaction) => {
+          const highScoreDoc = await transaction.get(highScoreRef);
+
+          if (!highScoreDoc.exists || newScore > highScoreDoc.data().score) {
+            transaction.set(highScoreRef, {
+              missionId: missionId,
+              userId: userId,
+              userName: decodedToken.name || 'Anonymous User',
+              score: newScore,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
+          
+          transaction.set(historyRef, {
+            userId: userId,
+            userName: decodedToken.name || 'Anonymous User',
+            missionId: missionId || 'unknown',
+            ...scoringResult.data,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        });
+
+        console.log('Mission result and high score processed successfully.');
+
+      } catch (error) {
+        console.error('Error processing mission result transaction:', error);
+      }
       res.status(200).send(scoringResult.data);
     } else {
       res.status(500).send({ error: "スコアリングに失敗しました。", details: scoringResult.error });
     }
-  } else if (type === 'get-history') {
-    try {
-      const snapshot = await db.collection('users').doc(userId).collection('sessions')
-                               .orderBy('createdAt', 'desc')
-                               .limit(20)
-                               .get();
-
-      if (snapshot.empty) {
-        res.status(200).send([]);
-        return;
-      }
-
-      const history = [];
-      snapshot.forEach(doc => {
-        let data = doc.data();
-        if (data.createdAt && data.createdAt.toDate) {
-          data.createdAt = data.createdAt.toDate().toISOString();
+      } else if (type === 'get-history') {
+        try {
+          const snapshot = await db.collection('users').doc(userId).collection('sessions')
+                                   .orderBy('createdAt', 'desc')
+                                   .limit(20)
+                                   .get();
+    
+          if (snapshot.empty) {
+            res.status(200).send([]);
+            return;
+          }
+    
+          const history = [];
+          snapshot.forEach(doc => {
+            let data = doc.data();
+            if (data.createdAt && data.createdAt.toDate) {
+              data.createdAt = data.createdAt.toDate().toISOString();
+            }
+            history.push({ id: doc.id, ...data });
+          });
+    
+          res.status(200).send(history);
+        } catch (error) {
+          console.error('Error getting practice history from Firestore:', error);
+          res.status(500).send({ error: 'Failed to retrieve practice history.' });
         }
-        history.push({ id: doc.id, ...data });
-      });
+    } else if (type === 'get-ranking') {
+      try {
+        const { missionId } = req.body;
+        if (!missionId) {
+          return res.status(400).send({ error: 'missionId is required.' });
+        }
 
-      res.status(200).send(history);
-    } catch (error) {
-      console.error('Error getting practice history from Firestore:', error);
-      res.status(500).send({ error: 'Failed to retrieve practice history.' });
-    }
-  } else {
-    res.status(400).send('Invalid request type');
-  }
-});
+        const snapshot = await db.collection('mission_high_scores')
+                                 .where('missionId', '==', missionId)
+                                 .orderBy('score', 'desc')
+                                 .limit(10)
+                                 .get();
+
+        if (snapshot.empty) {
+          return res.status(200).send([]);
+        }
+  
+        const ranking = snapshot.docs.map(doc => doc.data());
+        res.status(200).send(ranking);
+
+      } catch (error) {
+        console.error('Error getting ranking data from Firestore:', error);
+        res.status(500).send({ error: 'Failed to retrieve ranking data.' });
+      }      } else {
+        res.status(400).send('Invalid request type');
+      }});
 // Speech-to-Text関数
 async function transcribeAudio(audioContent) {
   try {

@@ -16,13 +16,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initializeDashboard(user) {
-    setupTabs();
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    const missionId = urlParams.get('missionId');
+
+    setupTabs(tab);
     loadAndRenderData(user.uid);
+    populateMissionSelect(missionId);
 }
 
-function setupTabs() {
+function setupTabs(defaultTab = 'analytics') {
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
+
+    // Activate the default tab
+    tabLinks.forEach(item => item.classList.remove('active'));
+    tabContents.forEach(item => item.classList.remove('active'));
+    document.querySelector(`.tab-link[data-tab="${defaultTab}"]`).classList.add('active');
+    document.getElementById(defaultTab).classList.add('active');
+
     tabLinks.forEach(link => {
         link.addEventListener('click', () => {
             const tabId = link.getAttribute('data-tab');
@@ -266,4 +278,97 @@ function hashCodeToHsl(hash) {
     const s = 70; // 彩度
     const l = 80; // 明度
     return `hsl(${h}, ${s}%, ${l}%)`;
+}
+
+async function populateMissionSelect(defaultMissionId = null) {
+    const selectElement = document.getElementById('mission-select');
+    try {
+        const db = firebase.firestore();
+        const snapshot = await db.collection('missions').get();
+
+        if (snapshot.empty) {
+            selectElement.innerHTML = '<option value="">ミッションがありません</option>';
+            return;
+        }
+
+        selectElement.innerHTML = '<option value="">ミッションを選択してください</option>';
+        snapshot.forEach(doc => {
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = doc.data().title;
+            selectElement.appendChild(option);
+        });
+
+        // If a default mission is provided via URL, select it
+        if (defaultMissionId) {
+            selectElement.value = defaultMissionId;
+            fetchAndRenderRanking(defaultMissionId);
+        }
+
+        selectElement.addEventListener('change', (event) => {
+            const missionId = event.target.value;
+            fetchAndRenderRanking(missionId);
+        });
+
+    } catch (error) {
+        console.error("Error populating mission select:", error);
+        selectElement.innerHTML = '<option value="">読み込みエラー</option>';
+    }
+}
+
+async function fetchAndRenderRanking(missionId) {
+    const container = document.getElementById('ranking-list-container');
+    
+    if (!missionId) {
+        container.innerHTML = '<p>ミッションを選択してください。</p>';
+        return;
+    }
+
+    container.innerHTML = '<p>ランキングを読み込んでいます...</p>';
+
+    try {
+        const user = firebase.auth().currentUser;
+        if (!user) throw new Error("ログインしていません。");
+        const idToken = await user.getIdToken(true);
+
+        const response = await fetch('https://coachapi-hruygwmczq-an.a.run.app', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ type: 'get-ranking', missionId: missionId })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'ランキングの取得に失敗しました。');
+        }
+
+        const rankingData = await response.json();
+
+        if (rankingData.length === 0) {
+            container.innerHTML = '<p>このミッションのランキングデータはまだありません。</p>';
+            return;
+        }
+
+        const ol = document.createElement('ol');
+        ol.className = 'ranking-list';
+        rankingData.forEach((entry, index) => {
+            const li = document.createElement('li');
+            li.className = 'ranking-item';
+            li.innerHTML = `
+                <span class="ranking-position">${index + 1}</span>
+                <span class="ranking-username">${entry.userName}</span>
+                <span class="ranking-score">${entry.score}</span>
+            `;
+            ol.appendChild(li);
+        });
+        container.innerHTML = '';
+        container.appendChild(ol);
+
+    } catch (error) {
+        console.error("Error fetching ranking data:", error);
+        container.innerHTML = `<p>ランキングの読み込み中にエラーが発生しました: ${error.message}</p>`;
+    }
 }

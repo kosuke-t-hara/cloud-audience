@@ -21,6 +21,7 @@
         <div class="tabs">
             <button class="tab-link active" data-tab="analytics">分析</button>
             <button class="tab-link" data-tab="activity">アクティビティ</button>
+            <button class="tab-link" data-tab="ranking">ランキング</button>
         </div>
 
         <!-- 分析タブのコンテンツ -->
@@ -54,6 +55,19 @@
         <div id="activity" class="tab-content">
             <div id="activity-list-container">
                 <p>アクティビティを読み込んでいます...</p>
+            </div>
+        </div>
+
+        <!-- ランキングタブのコンテンツ -->
+        <div id="ranking" class="tab-content">
+            <div class="ranking-controls">
+                <label for="mission-select">ミッションを選択:</label>
+                <select id="mission-select">
+                    <option value="">読み込み中...</option>
+                </select>
+            </div>
+            <div id="ranking-list-container">
+                <p>ミッションを選択してください。</p>
             </div>
         </div>
     </main>

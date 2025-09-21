@@ -1,0 +1,32 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ユーザーは自身のセッションデータのみ読み書き可能
+    match /users/{userId}/sessions/{sessionId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // ログインしていれば、ミッションの定義を読み取り可能
+    match /missions/{missionId} {
+      allow read: if request.auth != null;
+    }
+
+    // ミッションの挑戦履歴
+    match /mission_results/{resultId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ミッションごとの最高得点（ランキング用）
+    match /mission_high_scores/{compositeId} {
+      allow read: if request.auth != null;
+      // 複合ID `{missionId}_{userId}` とドキュメント内のデータが一致することを検証
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid
+                      && compositeId == request.resource.data.missionId + '_' + request.resource.data.userId;
+      allow delete: if false;
+    }
+  }
+}

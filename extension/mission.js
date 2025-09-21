@@ -109,6 +109,15 @@ document.addEventListener('DOMContentLoaded', () => {
         finishMission();
     });
 
+    showLeaderboardButton.addEventListener('click', () => {
+        const url = `https://prezento-ai-coach.web.app/dashboard.html?tab=ranking&missionId=${currentMissionId}`;
+        window.open(url, '_blank');
+    });
+
+    retryMissionButton.addEventListener('click', () => {
+        location.reload();
+    });
+
     // background.jsからのメッセージをリッスンする
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // このページからのメッセージは無視

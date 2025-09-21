@@ -21,6 +21,12 @@ header h1 {
   font-size: 1.5em;
 }
 
+header nav {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
 #auth-container, #history-list-container {
   max-width: 800px;
   margin: 40px auto;

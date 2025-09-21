@@ -1,79 +1,44 @@
 /* dashboard.css */
-:root {
-    --primary-color: #6B46C1; /* Purple */
-    --primary-color-light: #FAF5FF;
-    --text-color: #2D3748;
-    --text-color-secondary: #718096;
-    --bg-color: #F7FAFC;
-    --card-bg-color: #FFFFFF;
-    --border-color: #E2E8F0;
-}
-
-body {
-    background-color: var(--bg-color);
-    color: var(--text-color);
-}
-
-/* ヘッダーのボタンスタイル */
-header nav {
-    display: flex;
-    align-items: center;
-}
-
-.user-name-display {
-    margin-right: 1.5rem;
-    font-weight: 500;
-}
-
-header nav .button-link {
-    background-color: var(--primary-color);
-    color: white;
-    padding: 8px 15px;
-    border-radius: 5px;
-    text-decoration: none;
-    font-weight: 500;
-    transition: background-color 0.2s ease;
-}
-
-header nav .button-link:hover {
-    background-color: #553C9A; /* Darker Purple */
-}
 
 .dashboard-container {
     max-width: 1200px;
     margin: 2rem auto;
-    padding: 0 2rem;
+    padding: 2rem;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* タブ */
 .tabs {
     display: flex;
-    justify-content: flex-end; /* 右寄せ */
-    border-bottom: 2px solid var(--border-color);
+    border-bottom: 1px solid #e2e8f0;
     margin-bottom: 2rem;
 }
 
 .tab-link {
-    padding: 0.8rem 1.5rem;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
     border: none;
     background-color: transparent;
-    cursor: pointer;
     font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-color-secondary);
-    border-bottom: 3px solid transparent;
-    transition: all 0.3s ease;
-    margin-bottom: -2px; /* ボーダーと重なるように */
-}
-
-.tab-link:hover {
-    background-color: var(--primary-color-light);
-    color: var(--primary-color);
+    color: #4a5568;
+    position: relative;
+    transition: color 0.2s ease-in-out;
 }
 
 .tab-link.active {
-    color: var(--primary-color);
-    border-bottom-color: var(--primary-color);
+    color: #4f46e5;
+    font-weight: 600;
+}
+
+.tab-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #4f46e5;
 }
 
 .tab-content {
@@ -84,101 +49,90 @@ header nav .button-link:hover {
     display: block;
 }
 
-/* セクション共通 */
-.dashboard-container section {
-    background-color: var(--card-bg-color);
-    border-radius: 12px;
-    padding: 1.5rem 2rem;
+/* Performance Summary */
+.performance-summary-section {
     margin-bottom: 2rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-.dashboard-container h2 {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-color);
-}
-
-/* パフォーマンスサマリー */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    gap: 1.5rem;
 }
 
 .stat-card {
-    background-color: var(--primary-color-light);
+    background-color: #f7fafc;
+    padding: 1.5rem;
     border-radius: 8px;
-    padding: 1.25rem;
+    border: 1px solid #e2e8f0;
     text-align: center;
-    border-left: 5px solid var(--primary-color);
 }
 
 .stat-card h3 {
-    font-size: 1rem;
-    color: var(--text-color-secondary);
     margin: 0 0 0.5rem 0;
-    font-weight: 600;
+    font-size: 1rem;
+    color: #718096;
 }
 
 .stat-card p {
-    font-size: 2.2rem;
-    font-weight: 700;
-    color: var(--primary-color);
     margin: 0;
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: #2d3748;
 }
 
-/* チャート */
+/* Chart Section */
+.chart-section {
+    margin-bottom: 2rem;
+}
+
+.chart-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
 .chart-container {
+    position: relative;
     height: 400px;
 }
 
-/* アクティビティ */
+/* Activity List */
 #activity-list-container {
-    max-width: 600px;
-    margin: 0 auto; /* 中央寄せ */
-    background-color: var(--card-bg-color);
-    border-radius: 12px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    max-height: 70vh; /* ビューポートの高さの70%を最大高に */
-    overflow-y: auto; /* 高さを超えたらスクロール */
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
 .activity-card {
     display: flex;
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+    padding: 1rem;
+    background-color: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
 }
 
 .activity-card:hover {
-    background-color: #F7FAFC;
-}
-
-.activity-card:last-child {
-    border-bottom: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
 }
 
 .activity-card-icon {
     flex-shrink: 0;
-    width: 50px;
-    height: 50px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    background-color: var(--primary-color);
-    color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
-    font-weight: 700;
     margin-right: 1rem;
 }
 
 .activity-card-icon svg {
-    fill: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    opacity: 0.8;
 }
 
 .activity-card-content {
@@ -193,56 +147,93 @@ header nav .button-link:hover {
 }
 
 .activity-card-username {
-    font-weight: 700;
-    font-size: 1rem;
+    font-weight: 600;
+    color: #2d3748;
 }
 
 .activity-card-meta {
     display: flex;
     align-items: center;
-    gap: 0.75rem; /* 12px */
-    color: var(--text-color-secondary);
-    font-size: 0.85rem;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    color: #718096;
 }
 
 .activity-card-score {
-    font-weight: 700; /* 太字に変更 */
-    color: var(--primary-color);
-    font-size: 1rem; /* 少し大きく */
-}
-
-.activity-card-time {
-    position: relative; /* ツールチップの位置の基準 */
-}
-
-/* ツールチップのスタイル */
-.activity-card-time:hover::after {
-    content: attr(data-tooltip); /* data-tooltip属性の内容を表示 */
-    position: absolute;
-    bottom: 120%; /* 要素の上に表示 */
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: #333;
-    color: #fff;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    white-space: nowrap; /* 折り返しを防ぐ */
-    z-index: 10;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.2s;
-}
-
-.activity-card-time:hover::after {
-    opacity: 1;
-    visibility: visible;
+    font-weight: bold;
+    color: #4f46e5;
+    background-color: #e0e7ff;
+    padding: 0.2rem 0.5rem;
+    border-radius: 9999px;
 }
 
 .activity-card-comment {
     margin: 0;
-    line-height: 1.6;
-    font-size: 0.95rem;
-    color: var(--text-color);
-    word-wrap: break-word; /* 長い単語の折り返し */
+    color: #4a5568;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Ranking List Styles */
+.ranking-controls {
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ranking-controls label {
+    font-weight: 500;
+}
+
+#mission-select {
+    padding: 0.5rem;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background-color: #fff;
+    font-size: 1rem;
+}
+
+.ranking-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.ranking-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.ranking-item:last-child {
+    border-bottom: none;
+}
+
+.ranking-item:hover {
+    background-color: #f7fafc;
+}
+
+.ranking-position {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #718096;
+    width: 40px;
+    text-align: center;
+}
+
+.ranking-username {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #2d3748;
+    flex-grow: 1;
+    margin-left: 1rem;
+}
+
+.ranking-score {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #4f46e5;
 }

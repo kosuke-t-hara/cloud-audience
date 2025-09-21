@@ -91,7 +91,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     request.type === 'GET_AUTH_STATE' || 
     request.type === 'SIGN_IN_WITH_TOKEN' ||
     request.action === 'start' || 
-    request.action === 'stop';
+    request.action === 'stop' ||
+    request.action === 'requestScoring';
 
   // 非同期処理を即時実行関数でラップ
   (async () => {
