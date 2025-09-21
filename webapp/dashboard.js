@@ -20,7 +20,7 @@ function initializeDashboard(user) {
     const tab = urlParams.get('tab');
     const missionId = urlParams.get('missionId');
 
-    setupTabs(tab);
+    setupTabs(tab || 'analytics');
     loadAndRenderData(user.uid);
     populateMissionSelect(missionId);
 }
@@ -32,8 +32,16 @@ function setupTabs(defaultTab = 'analytics') {
     // Activate the default tab
     tabLinks.forEach(item => item.classList.remove('active'));
     tabContents.forEach(item => item.classList.remove('active'));
-    document.querySelector(`.tab-link[data-tab="${defaultTab}"]`).classList.add('active');
-    document.getElementById(defaultTab).classList.add('active');
+    
+    const defaultTabLink = document.querySelector(`.tab-link[data-tab="${defaultTab}"]`);
+    const defaultTabContent = document.getElementById(defaultTab);
+
+    if (defaultTabLink) {
+        defaultTabLink.classList.add('active');
+    }
+    if (defaultTabContent) {
+        defaultTabContent.classList.add('active');
+    }
 
     tabLinks.forEach(link => {
         link.addEventListener('click', () => {
@@ -41,7 +49,10 @@ function setupTabs(defaultTab = 'analytics') {
             tabLinks.forEach(item => item.classList.remove('active'));
             tabContents.forEach(item => item.classList.remove('active'));
             link.classList.add('active');
-            document.getElementById(tabId).classList.add('active');
+            const tabContent = document.getElementById(tabId);
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
         });
     });
 }
