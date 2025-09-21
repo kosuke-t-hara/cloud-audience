@@ -139,12 +139,10 @@ document.addEventListener('DOMContentLoaded', () => {
         finishMissionButton.disabled = true; // ボタンを無効化
         statusText.textContent = 'ミッション完了！結果を計算しています...';
         
-        // ★★★ 変更: stopメッセージの完了後にスコアリングを依頼 ★★★
-        chrome.runtime.sendMessage({ action: "stop" }, () => {
-            if (chrome.runtime.lastError) {
-                console.error("Stop command failed:", chrome.runtime.lastError.message);
-            }
-            
+        // ★★★ 変更: stopを呼び出し、短い遅延の後にスコアリングを依頼 ★★★
+        chrome.runtime.sendMessage({ action: "stop" });
+
+        setTimeout(() => {
             // 構造化された対話ログを生成
             const conversationLog = [];
             transcriptLog.querySelectorAll('p').forEach(p => {
@@ -162,16 +160,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 objective: objectiveText
             }, (response) => {
                 if (chrome.runtime.lastError) {
-                    console.error(chrome.runtime.lastError.message);
+                    console.error("Scoring message failed:", chrome.runtime.lastError.message);
                     displayResults({ success: false, message: 'スコアの計算中にエラーが発生しました。', score: 0 });
-                } else if (!response.success) {
-                    console.error('Scoring failed:', response.error);
+                } else if (response && !response.success) {
+                    console.error('Scoring failed on server:', response.error);
                     displayResults({ success: false, message: `スコア計算エラー: ${response.error}`, score: 0 });
-                } else {
+                } else if (response) {
                     displayResults(response.results);
+                } else {
+                    // responseがundefinedの場合のフォールバック
+                    displayResults({ success: false, message: 'スコアサーバーから予期しない応答がありました。', score: 0 });
                 }
             });
-        });
+        }, 100); // 100ミリ秒の遅延
     }
 
     // --- 結果を表示し、Firestoreに保存する ---

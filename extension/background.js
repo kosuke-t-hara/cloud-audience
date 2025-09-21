@@ -70,6 +70,13 @@ chrome.commands.onCommand.addListener((command) => {
 
 chrome.windows.onRemoved.addListener((windowId) => {
   if (windowId === helperWindowId) {
+    // ★★★ 変更: ミッションモード中は、ヘルパーウィンドウが閉じても録音を止めない ★★★
+    if (currentMode === 'mission') {
+      console.log("ミッションモード中にヘルパーウィンドウが閉じられましたが、セッションは継続します。");
+      helperWindowId = null; // IDだけリセット
+      return;
+    }
+    
     if (isRecording) {
         stopRecording();
     }
@@ -285,12 +292,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         break;
       case "stop":
-        // ★★★ 変更: UI削除の責任をこのハンドラに移動 ★★★
         if (targetTabId) {
           chrome.tabs.sendMessage(targetTabId, { type: 'remove_ui_elements' }).catch(e => console.log("UI削除メッセージの送信に失敗しました:", e.message));
         }
-        stopRecording(sendResponse);
-        return true; // 非同期応答を示す
+        stopRecording(); // コールバックを渡さない
+        sendResponse({}); // すぐに応答を返す
+        break;
     }
   })();
   
@@ -312,7 +319,7 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis, tabId = null)
   sessionFeedbackHistory = [];
   elapsedTimeInSeconds = 0;
   consecutiveFailures = 0;
-  isDetectionPaused = false; // ★ 録音開始時に必ずリセット
+  isDetectionPaused = false;
 
   timerInterval = setInterval(() => {
     elapsedTimeInSeconds++;
@@ -329,7 +336,6 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis, tabId = null)
   const setupRecordingTab = (id) => {
     targetTabId = id;
 
-    // ★★★ 変更: ミッションモードでは注入しない、元の正しいロジックに戻す ★★★
     if (currentMode !== 'mission') {
       chrome.scripting.insertCSS({ target: { tabId: targetTabId }, files: ["content.css"] });
       chrome.scripting.executeScript({ target: { tabId: targetTabId }, files: ["content.js"] });
@@ -360,33 +366,26 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis, tabId = null)
   }
 }
 
-function stopRecording(sendResponseCallback) {
+function stopRecording() { // sendResponseCallback を削除
   console.log('[background.js] stopRecording called.');
   isRecording = false;
 
-  chrome.action.setBadgeText({ text: '' }); // バッジをクリア
-  chrome.action.setBadgeBackgroundColor({ color: '#FFFFFF' }); // 色をリセット
+  chrome.action.setBadgeText({ text: '' });
+  chrome.action.setBadgeBackgroundColor({ color: '#FFFFFF' });
   
   clearInterval(timerInterval);
   timerInterval = null;
   
-  // ★★★ 変更: UI削除ロジックを削除し、技術的な停止処理に専念 ★★★
   targetTabId = null;
 
   if (helperWindowId) {
-    // mic_helperに停止を伝えるが、応答は待たない
     chrome.runtime.sendMessage({ type: 'stop_recording' }).catch(e => console.log(e));
     helperWindowId = null;
   }
 
-  // ミッションモードでない場合のみサマリーを生成
   if (currentMode !== 'mission') {
-    generateSummary(sessionAnalysisResults, conversationSummary, elapsedTimeInSeconds, sessionFeedbackHistory, sendResponseCallback);
-  } else {
-    // ミッションモードの場合、または他のケースでも、コールバックがあれば応答する
-    if (sendResponseCallback) {
-      sendResponseCallback({ message: "録音を停止しました。" });
-    }
+    // stopRecordingは非同期でなくなったので、sendResponseCallbackを渡さない
+    generateSummary(sessionAnalysisResults, conversationSummary, elapsedTimeInSeconds, sessionFeedbackHistory);
   }
 }
 
