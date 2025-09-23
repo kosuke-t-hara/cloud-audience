@@ -148,6 +148,7 @@ extension.zip
 key.pem
 extension.crx
 sensitive-data.txt
+replacements.txt
 
 # functions/service-account-key.json
 functions/service-account-key.json
