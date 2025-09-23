@@ -147,6 +147,7 @@ GEMINI.md
 extension.zip
 key.pem
 extension.crx
+sensitive-data.txt
 
 # functions/service-account-key.json
 functions/service-account-key.json
