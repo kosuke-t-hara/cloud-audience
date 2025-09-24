@@ -470,6 +470,7 @@ async function handleAudioChunk(audioContent) {
 
     if (isFaceAnalysisEnabled) {
       requestBody.videoFrameContent = latestVideoFrame;
+      console.log(requestBody.videoFrameContent ? "最新のビデオフレームを送信しています。" : "ビデオフレームがありません。");
     }
 
     // エフェクト表示のトリガーをcontent.jsに送信

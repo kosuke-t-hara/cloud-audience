@@ -470,6 +470,9 @@ functions.http('coachApi', async (req, res) => {
       analyzeVideoFrame(videoFrameContent)
     ]);
 
+    // ★★★ ログ追加 ★★★
+    console.log(`Facial feedback received: ${facialFeedback}`);
+
     const transcript = analysisData ? analysisData.fullTranscript : null;
     const geminiResult = await getGeminiVisionFeedback(transcript, imageContent, mode, history || [], facialFeedback, persona, conversationSummary);
 
@@ -662,15 +665,25 @@ async function analyzeVideoFrame(videoFrameContent) {
       features: [{ type: 'FACE_DETECTION' }],
     };
     const [result] = await visionClient.annotateImage(request);
+
+    // ★★★ ログ追加 1: Vision APIの生レスポンス ★★★
+    console.log("Vision API response:", JSON.stringify(result, null, 2));
+
     const faces = result.faceAnnotations;
     if (faces && faces.length > 0) {
       const face = faces[0];
       const likelihoods = ['UNKNOWN', 'VERY_UNLIKELY', 'UNLIKELY', 'POSSIBLE', 'LIKELY', 'VERY_LIKELY'];
-      if (likelihoods.indexOf(face.joyLikelihood) >= 4) return "笑顔、あるいは喜びの表情";
-      if (likelihoods.indexOf(face.surpriseLikelihood) >= 4) return "驚いている表情";
-      if (likelihoods.indexOf(face.sorrowLikelihood) >= 4) return "悲しそう、あるいは心配そうな表情";
-      return "落ち着いた表情です";
+      let feedback = "落ち着いた表情です"; // デフォルト
+      if (likelihoods.indexOf(face.joyLikelihood) >= 4) feedback = "笑顔、あるいは喜びの表情";
+      else if (likelihoods.indexOf(face.surpriseLikelihood) >= 4) feedback = "驚いている表情";
+      else if (likelihoods.indexOf(face.sorrowLikelihood) >= 4) feedback = "悲しそう、あるいは心配そうな表情";
+      
+      // ★★★ ログ追加 2: 判定結果 ★★★
+      console.log("Facial analysis result:", feedback);
+      return feedback;
     }
+    
+    console.log("No faces detected.");
     return "表情は検出されませんでした";
   } catch (error) {
     console.error('Vision APIエラー:', error);
