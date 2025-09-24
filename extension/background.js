@@ -318,10 +318,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         break;
       case "stop":
-        if (targetTabId) {
-          chrome.tabs.sendMessage(targetTabId, { type: 'remove_ui_elements' }).catch(e => console.log("UI削除メッセージの送信に失敗しました:", e.message));
-        }
-        stopRecording(); // コールバックを渡さない
+        stopRecording();
         sendResponse({}); // すぐに応答を返す
         break;
     }
@@ -401,6 +398,13 @@ function startRecording(mode, persona, feedbackMode, faceAnalysis, tabId = null)
 function stopRecording() { // sendResponseCallback を削除
   console.log('[background.js] stopRecording called.');
   isRecording = false;
+
+  // ★★★ 修正箇所: 先にUI削除メッセージを送る ★★★
+  if (targetTabId) {
+    chrome.tabs.sendMessage(targetTabId, { type: 'remove_ui_elements' })
+      .catch(e => console.log("UI削除メッセージの送信に失敗しました:", e.message));
+  }
+  // ★★★ ここまで ★★★
 
   chrome.action.setBadgeText({ text: '' });
   chrome.action.setBadgeBackgroundColor({ color: '#FFFFFF' });
