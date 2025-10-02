@@ -10,8 +10,7 @@
     "storage",
     "identity",
     "notifications",
-    "alarms",
-    "camera"
+    "alarms"
   ],
   "host_permissions": [
     "https://coachapi-hruygwmczq-an.a.run.app/"
